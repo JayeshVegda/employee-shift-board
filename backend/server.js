@@ -135,7 +135,8 @@ app.get('/api', (req, res) => {
         shifts: '/api/shifts',
         issues: '/api/issues',
         analytics: '/api/analytics',
-        health: '/api/health'
+        health: '/api/health',
+        databaseHealth: '/api/health/db'
       },
       timestamp: new Date().toISOString()
     });
@@ -194,16 +195,111 @@ app.all(/^\/(login|employees|shifts|issues|analytics|health)/, (req, res) => {
   });
 });
 
-// Database health check
+// Enhanced Database health check endpoint
 app.get('/api/health/db', async (req, res) => {
+  const mongoose = require('mongoose');
+  const healthInfo = {
+    timestamp: new Date().toISOString(),
+    status: 'UNKNOWN',
+    connection: {
+      state: mongoose.connection.readyState,
+      stateText: ['disconnected', 'connected', 'connecting', 'disconnecting'][mongoose.connection.readyState] || 'unknown',
+      host: null,
+      name: null,
+      port: null
+    },
+    environment: {
+      mongodbUri: process.env.MONGODB_URI ? 'SET' : 'NOT SET',
+      uriLength: process.env.MONGODB_URI ? process.env.MONGODB_URI.length : 0
+    },
+    test: {
+      ping: null,
+      collections: null,
+      error: null
+    }
+  };
+
   try {
-    await connectWithRetry();
-    res.json({ status: 'OK', message: 'Database connected' });
+    // Check connection state
+    if (mongoose.connection.readyState === 1) {
+      // Already connected
+      healthInfo.connection.host = mongoose.connection.host;
+      healthInfo.connection.name = mongoose.connection.name;
+      healthInfo.connection.port = mongoose.connection.port;
+      healthInfo.status = 'CONNECTED';
+      
+      // Test database with ping
+      try {
+        await mongoose.connection.db.admin().ping();
+        healthInfo.test.ping = 'OK';
+        
+        // Get collections count
+        const collections = await mongoose.connection.db.listCollections().toArray();
+        healthInfo.test.collections = collections.length;
+        healthInfo.test.collectionNames = collections.map(c => c.name);
+      } catch (testError) {
+        healthInfo.test.ping = 'FAILED';
+        healthInfo.test.error = testError.message;
+        healthInfo.status = 'CONNECTED_BUT_ERROR';
+      }
+    } else {
+      // Try to connect
+      try {
+        await connectWithRetry();
+        
+        if (mongoose.connection.readyState === 1) {
+          healthInfo.connection.host = mongoose.connection.host;
+          healthInfo.connection.name = mongoose.connection.name;
+          healthInfo.connection.port = mongoose.connection.port;
+          healthInfo.status = 'CONNECTED';
+          
+          // Test database
+          try {
+            await mongoose.connection.db.admin().ping();
+            healthInfo.test.ping = 'OK';
+            
+            const collections = await mongoose.connection.db.listCollections().toArray();
+            healthInfo.test.collections = collections.length;
+            healthInfo.test.collectionNames = collections.map(c => c.name);
+          } catch (testError) {
+            healthInfo.test.ping = 'FAILED';
+            healthInfo.test.error = testError.message;
+          }
+        } else {
+          healthInfo.status = 'CONNECTION_FAILED';
+          healthInfo.test.error = 'Connection state is not connected after retry';
+        }
+      } catch (error) {
+        healthInfo.status = 'ERROR';
+        healthInfo.test.error = error.message;
+        healthInfo.connection.error = error.message;
+      }
+    }
+
+    // Return appropriate status code
+    if (healthInfo.status === 'CONNECTED' && healthInfo.test.ping === 'OK') {
+      res.json({
+        ...healthInfo,
+        message: 'Database is healthy and responsive'
+      });
+    } else if (healthInfo.status === 'CONNECTED') {
+      res.status(503).json({
+        ...healthInfo,
+        message: 'Database connected but not responding to queries'
+      });
+    } else {
+      res.status(503).json({
+        ...healthInfo,
+        message: 'Database connection failed'
+      });
+    }
   } catch (error) {
-    res.status(500).json({ 
-      status: 'ERROR', 
-      message: 'Database connection failed',
-      error: error.message 
+    res.status(500).json({
+      ...healthInfo,
+      status: 'FATAL_ERROR',
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
+      message: 'Failed to check database health'
     });
   }
 });
