@@ -147,42 +147,67 @@ app.get('/api', (req, res) => {
 
 // Routes - mount only successfully loaded routes
 console.log('Mounting routes...');
+console.log('Route objects:', {
+  authRoutes: !!authRoutes,
+  employeeRoutes: !!employeeRoutes,
+  shiftRoutes: !!shiftRoutes,
+  issueRoutes: !!issueRoutes,
+  analyticsRoutes: !!analyticsRoutes
+});
+
 if (authRoutes) {
   app.use('/api', authRoutes);
-  console.log('✓ authRoutes mounted');
+  console.log('✓ authRoutes mounted at /api');
 } else {
-  console.error('✗ authRoutes failed to mount');
+  console.error('✗ authRoutes failed to mount - route object is null/undefined');
 }
 
 if (employeeRoutes) {
   app.use('/api/employees', employeeRoutes);
-  console.log('✓ employeeRoutes mounted');
+  console.log('✓ employeeRoutes mounted at /api/employees');
 } else {
-  console.error('✗ employeeRoutes failed to mount');
+  console.error('✗ employeeRoutes failed to mount - route object is null/undefined');
 }
 
 if (shiftRoutes) {
   app.use('/api/shifts', shiftRoutes);
-  console.log('✓ shiftRoutes mounted');
+  console.log('✓ shiftRoutes mounted at /api/shifts');
 } else {
-  console.error('✗ shiftRoutes failed to mount');
+  console.error('✗ shiftRoutes failed to mount - route object is null/undefined');
 }
 
 if (issueRoutes) {
   app.use('/api/issues', issueRoutes);
-  console.log('✓ issueRoutes mounted');
+  console.log('✓ issueRoutes mounted at /api/issues');
 } else {
-  console.error('✗ issueRoutes failed to mount');
+  console.error('✗ issueRoutes failed to mount - route object is null/undefined');
 }
 
 if (analyticsRoutes) {
   app.use('/api/analytics', analyticsRoutes);
-  console.log('✓ analyticsRoutes mounted');
+  console.log('✓ analyticsRoutes mounted at /api/analytics');
 } else {
-  console.error('✗ analyticsRoutes failed to mount');
+  console.error('✗ analyticsRoutes failed to mount - route object is null/undefined');
 }
 
 console.log('Route mounting complete');
+
+// Test route to verify routes are working (no auth required)
+app.get('/api/test-routes', (req, res) => {
+  res.json({
+    message: 'Routes are working!',
+    routesStatus: {
+      authRoutes: !!authRoutes,
+      employeeRoutes: !!employeeRoutes,
+      shiftRoutes: !!shiftRoutes,
+      issueRoutes: !!issueRoutes,
+      analyticsRoutes: !!analyticsRoutes
+    },
+    requestPath: req.path,
+    requestMethod: req.method,
+    timestamp: new Date().toISOString()
+  });
+});
 
 // Catch requests to root-level paths (like /login instead of /api/login)
 // This helps debug when frontend API_URL is missing /api
@@ -305,11 +330,32 @@ app.get('/api/health/db', async (req, res) => {
 });
 
 // 404 handler - CORS headers already set by cors() middleware
+// Add logging to help debug route matching
 app.use((req, res) => {
+  console.log(`404 - Route not found: ${req.method} ${req.path}`);
+  console.log('Available routes:', {
+    '/api': 'authRoutes',
+    '/api/employees': 'employeeRoutes',
+    '/api/shifts': 'shiftRoutes',
+    '/api/issues': 'issueRoutes',
+    '/api/analytics': 'analyticsRoutes'
+  });
+  
   res.status(404).json({ 
     error: 'Route not found', 
     path: req.path,
-    hint: req.path.startsWith('/api') ? 'Check the route path' : 'Routes should start with /api'
+    method: req.method,
+    hint: req.path.startsWith('/api') ? 'Check the route path and ensure you have a valid auth token' : 'Routes should start with /api',
+    availableRoutes: [
+      '/api/login (POST)',
+      '/api/employees (GET, POST, PUT, DELETE) - requires auth',
+      '/api/shifts (GET, POST, PUT, DELETE) - requires auth',
+      '/api/issues (GET, POST, PUT, DELETE) - requires auth',
+      '/api/analytics/dashboard (GET) - requires auth',
+      '/api/health (GET)',
+      '/api/health/db (GET)',
+      '/api/test-routes (GET)'
+    ]
   });
 });
 
