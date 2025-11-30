@@ -9,32 +9,20 @@ try {
 const express = require('express');
 const cors = require('cors');
 
-// Import routes and middleware with error handling
-let connectDB, errorHandler, authRoutes, employeeRoutes, shiftRoutes, issueRoutes, analyticsRoutes;
-
-try {
-  connectDB = require('./config/database');
-  errorHandler = require('./middleware/errorHandler');
-  authRoutes = require('./routes/authRoutes');
-  employeeRoutes = require('./routes/employeeRoutes');
-  shiftRoutes = require('./routes/shiftRoutes');
-  issueRoutes = require('./routes/issueRoutes');
-  analyticsRoutes = require('./routes/analyticsRoutes');
-} catch (error) {
-  console.error('Error loading modules:', error);
-  // Don't throw - let the app start and show error in health check
-}
+// Import routes and middleware - routes are critical, so fail fast if they don't load
+const connectDB = require('./config/database');
+const errorHandler = require('./middleware/errorHandler');
+const authRoutes = require('./routes/authRoutes');
+const employeeRoutes = require('./routes/employeeRoutes');
+const shiftRoutes = require('./routes/shiftRoutes');
+const issueRoutes = require('./routes/issueRoutes');
+const analyticsRoutes = require('./routes/analyticsRoutes');
 
 const app = express();
 
 // Connect to database (for serverless, connection is cached)
 let isConnected = false;
 const connectWithRetry = async () => {
-  if (!connectDB) {
-    console.warn('Database module not loaded');
-    return;
-  }
-  
   if (!isConnected) {
     try {
       await connectDB();
@@ -77,6 +65,15 @@ app.use(async (req, res, next) => {
 // Root level OPTIONS handler (catch-all for any path)
 app.options('*', cors());
 
+// Health check (simple, no DB required) - define BEFORE routes to ensure it works
+app.get('/api/health', (req, res) => {
+  res.json({ 
+    status: 'OK', 
+    message: 'Server is running',
+    timestamp: new Date().toISOString()
+  });
+});
+
 // Root API endpoint - returns API information (no dependencies)
 app.get('/api', (req, res) => {
   try {
@@ -84,10 +81,12 @@ app.get('/api', (req, res) => {
       name: 'Employee Shift Board API',
       version: '1.0.0',
       status: 'running',
-      modulesLoaded: {
-        routes: !!(authRoutes && employeeRoutes && shiftRoutes),
-        database: !!connectDB,
-        errorHandler: !!errorHandler
+      routesMounted: {
+        auth: !!authRoutes,
+        employees: !!employeeRoutes,
+        shifts: !!shiftRoutes,
+        issues: !!issueRoutes,
+        analytics: !!analyticsRoutes
       },
       endpoints: {
         auth: '/api/login',
@@ -104,12 +103,14 @@ app.get('/api', (req, res) => {
   }
 });
 
-// Routes - only mount if loaded successfully
-if (authRoutes) app.use('/api', authRoutes);
-if (employeeRoutes) app.use('/api/employees', employeeRoutes);
-if (shiftRoutes) app.use('/api/shifts', shiftRoutes);
-if (issueRoutes) app.use('/api/issues', issueRoutes);
-if (analyticsRoutes) app.use('/api/analytics', analyticsRoutes);
+// Routes - mount all routes
+console.log('Mounting routes...');
+app.use('/api', authRoutes);
+app.use('/api/employees', employeeRoutes);
+app.use('/api/shifts', shiftRoutes);
+app.use('/api/issues', issueRoutes);
+app.use('/api/analytics', analyticsRoutes);
+console.log('Routes mounted successfully');
 
 // Catch requests to root-level paths (like /login instead of /api/login)
 // This helps debug when frontend API_URL is missing /api
@@ -119,15 +120,6 @@ app.all(/^\/(login|employees|shifts|issues|analytics|health)/, (req, res) => {
     path: req.path,
     message: `Use /api${req.path} instead of ${req.path}`,
     correctPath: `/api${req.path}`
-  });
-});
-
-// Health check (simple, no DB required)
-app.get('/api/health', (req, res) => {
-  res.json({ 
-    status: 'OK', 
-    message: 'Server is running',
-    timestamp: new Date().toISOString()
   });
 });
 
@@ -155,18 +147,7 @@ app.use((req, res) => {
 });
 
 // Error handler middleware (must be last)
-if (errorHandler) {
-  app.use(errorHandler);
-} else {
-  // Fallback error handler if module failed to load
-  app.use((err, req, res, next) => {
-    console.error('Unhandled error:', err);
-    res.status(500).json({ 
-      error: 'Internal server error',
-      message: err.message 
-    });
-  });
-}
+app.use(errorHandler);
 
 // CRITICAL: Export the app for Vercel serverless
 // According to latest Vercel docs, direct export is most robust
@@ -175,9 +156,7 @@ module.exports = app;
 // For local development only
 if (require.main === module) {
   const PORT = process.env.PORT || 5000;
-  if (connectDB) {
-    connectDB();
-  }
+  connectDB();
   app.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT}`);
   });
