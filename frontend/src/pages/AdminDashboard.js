@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { getDashboardAnalytics, getUnreadIssueCount, getEmployees } from '../services/authService';
 import AdminLayout from '../components/AdminLayout';
 import {
@@ -579,7 +579,6 @@ const AdminDashboard = () => {
               </div>
             </div>
           </div>
-        </div>
     </AdminLayout>
   );
 };
