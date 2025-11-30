@@ -18,7 +18,7 @@ const issueSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['pending', 'resolved'],
+    enum: ['pending', 'open', 'resolved', 'closed'],
     default: 'pending',
   },
   shiftId: {

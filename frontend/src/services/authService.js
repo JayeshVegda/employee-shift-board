@@ -115,8 +115,11 @@ export const deleteIssue = async (id) => {
   return response.data;
 };
 
-export const getDashboardAnalytics = async () => {
-  const response = await api.get('/analytics/dashboard');
+export const getDashboardAnalytics = async (startDate = null, endDate = null) => {
+  const params = {};
+  if (startDate) params.startDate = startDate;
+  if (endDate) params.endDate = endDate;
+  const response = await api.get('/analytics/dashboard', { params });
   return response.data;
 };
 
