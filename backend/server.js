@@ -9,14 +9,54 @@ try {
 const express = require('express');
 const cors = require('cors');
 
-// Import routes and middleware - routes are critical, so fail fast if they don't load
-const connectDB = require('./config/database');
-const errorHandler = require('./middleware/errorHandler');
-const authRoutes = require('./routes/authRoutes');
-const employeeRoutes = require('./routes/employeeRoutes');
-const shiftRoutes = require('./routes/shiftRoutes');
-const issueRoutes = require('./routes/issueRoutes');
-const analyticsRoutes = require('./routes/analyticsRoutes');
+// Import core modules with error handling
+let connectDB, errorHandler;
+try {
+  connectDB = require('./config/database');
+  errorHandler = require('./middleware/errorHandler');
+} catch (error) {
+  console.error('Error loading core modules:', error);
+  throw error; // Core modules must load
+}
+
+// Import routes with error handling - routes can fail individually
+let authRoutes, employeeRoutes, shiftRoutes, issueRoutes, analyticsRoutes;
+const routeErrors = {};
+
+try {
+  authRoutes = require('./routes/authRoutes');
+} catch (error) {
+  console.error('Error loading authRoutes:', error.message);
+  routeErrors.auth = error.message;
+}
+
+try {
+  employeeRoutes = require('./routes/employeeRoutes');
+} catch (error) {
+  console.error('Error loading employeeRoutes:', error.message);
+  routeErrors.employees = error.message;
+}
+
+try {
+  shiftRoutes = require('./routes/shiftRoutes');
+} catch (error) {
+  console.error('Error loading shiftRoutes:', error.message);
+  routeErrors.shifts = error.message;
+}
+
+try {
+  issueRoutes = require('./routes/issueRoutes');
+} catch (error) {
+  console.error('Error loading issueRoutes:', error.message);
+  routeErrors.issues = error.message;
+}
+
+try {
+  analyticsRoutes = require('./routes/analyticsRoutes');
+} catch (error) {
+  console.error('Error loading analyticsRoutes:', error.message);
+  routeErrors.analytics = error.message;
+}
 
 const app = express();
 
@@ -88,6 +128,7 @@ app.get('/api', (req, res) => {
         issues: !!issueRoutes,
         analytics: !!analyticsRoutes
       },
+      routeErrors: Object.keys(routeErrors).length > 0 ? routeErrors : undefined,
       endpoints: {
         auth: '/api/login',
         employees: '/api/employees',
@@ -103,14 +144,44 @@ app.get('/api', (req, res) => {
   }
 });
 
-// Routes - mount all routes
+// Routes - mount only successfully loaded routes
 console.log('Mounting routes...');
-app.use('/api', authRoutes);
-app.use('/api/employees', employeeRoutes);
-app.use('/api/shifts', shiftRoutes);
-app.use('/api/issues', issueRoutes);
-app.use('/api/analytics', analyticsRoutes);
-console.log('Routes mounted successfully');
+if (authRoutes) {
+  app.use('/api', authRoutes);
+  console.log('✓ authRoutes mounted');
+} else {
+  console.error('✗ authRoutes failed to mount');
+}
+
+if (employeeRoutes) {
+  app.use('/api/employees', employeeRoutes);
+  console.log('✓ employeeRoutes mounted');
+} else {
+  console.error('✗ employeeRoutes failed to mount');
+}
+
+if (shiftRoutes) {
+  app.use('/api/shifts', shiftRoutes);
+  console.log('✓ shiftRoutes mounted');
+} else {
+  console.error('✗ shiftRoutes failed to mount');
+}
+
+if (issueRoutes) {
+  app.use('/api/issues', issueRoutes);
+  console.log('✓ issueRoutes mounted');
+} else {
+  console.error('✗ issueRoutes failed to mount');
+}
+
+if (analyticsRoutes) {
+  app.use('/api/analytics', analyticsRoutes);
+  console.log('✓ analyticsRoutes mounted');
+} else {
+  console.error('✗ analyticsRoutes failed to mount');
+}
+
+console.log('Route mounting complete');
 
 // Catch requests to root-level paths (like /login instead of /api/login)
 // This helps debug when frontend API_URL is missing /api
@@ -147,11 +218,35 @@ app.use((req, res) => {
 });
 
 // Error handler middleware (must be last)
-app.use(errorHandler);
+if (errorHandler) {
+  app.use(errorHandler);
+} else {
+  // Fallback error handler
+  app.use((err, req, res, next) => {
+    console.error('Unhandled error:', err);
+    res.status(err.status || 500).json({
+      error: 'Internal server error',
+      message: err.message
+    });
+  });
+}
 
 // CRITICAL: Export the app for Vercel serverless
 // According to latest Vercel docs, direct export is most robust
-module.exports = app;
+// Wrap in try-catch to ensure we always export something
+try {
+  module.exports = app;
+} catch (error) {
+  console.error('Fatal error exporting app:', error);
+  // Export a minimal error handler as fallback
+  module.exports = (req, res) => {
+    res.status(500).json({
+      error: 'Server initialization failed',
+      message: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+  };
+}
 
 // For local development only
 if (require.main === module) {
