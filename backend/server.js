@@ -1,26 +1,28 @@
-// Initialize with error handling
+// Initialize with error handling - don't crash on missing dotenv
 try {
   require('dotenv').config();
 } catch (error) {
+  // dotenv is optional in production (Vercel uses env vars)
   console.warn('dotenv config warning:', error.message);
 }
 
 const express = require('express');
 const cors = require('cors');
-const connectDB = require('./config/database');
-const errorHandler = require('./middleware/errorHandler');
 
-// Routes - wrap in try-catch to catch import errors
-let authRoutes, employeeRoutes, shiftRoutes, issueRoutes, analyticsRoutes;
+// Import routes and middleware with error handling
+let connectDB, errorHandler, authRoutes, employeeRoutes, shiftRoutes, issueRoutes, analyticsRoutes;
+
 try {
+  connectDB = require('./config/database');
+  errorHandler = require('./middleware/errorHandler');
   authRoutes = require('./routes/authRoutes');
   employeeRoutes = require('./routes/employeeRoutes');
   shiftRoutes = require('./routes/shiftRoutes');
   issueRoutes = require('./routes/issueRoutes');
   analyticsRoutes = require('./routes/analyticsRoutes');
 } catch (error) {
-  console.error('Error loading routes:', error);
-  throw error;
+  console.error('Error loading modules:', error);
+  // Don't throw - let the app start and show error in health check
 }
 
 const app = express();
@@ -28,14 +30,19 @@ const app = express();
 // Connect to database (for serverless, connection is cached)
 let isConnected = false;
 const connectWithRetry = async () => {
+  if (!connectDB) {
+    console.warn('Database module not loaded');
+    return;
+  }
+  
   if (!isConnected) {
     try {
       await connectDB();
       isConnected = true;
     } catch (error) {
-      console.error('Database connection error:', error);
+      console.error('Database connection error:', error.message);
       isConnected = false;
-      throw error;
+      // Don't throw - let routes handle it
     }
   }
 };
@@ -70,30 +77,39 @@ app.use(async (req, res, next) => {
 // Root level OPTIONS handler (catch-all for any path)
 app.options('*', cors());
 
-// Root API endpoint - returns API information
+// Root API endpoint - returns API information (no dependencies)
 app.get('/api', (req, res) => {
-  res.json({
-    name: 'Employee Shift Board API',
-    version: '1.0.0',
-    status: 'running',
-    endpoints: {
-      auth: '/api/login',
-      employees: '/api/employees',
-      shifts: '/api/shifts',
-      issues: '/api/issues',
-      analytics: '/api/analytics',
-      health: '/api/health'
-    },
-    timestamp: new Date().toISOString()
-  });
+  try {
+    res.json({
+      name: 'Employee Shift Board API',
+      version: '1.0.0',
+      status: 'running',
+      modulesLoaded: {
+        routes: !!(authRoutes && employeeRoutes && shiftRoutes),
+        database: !!connectDB,
+        errorHandler: !!errorHandler
+      },
+      endpoints: {
+        auth: '/api/login',
+        employees: '/api/employees',
+        shifts: '/api/shifts',
+        issues: '/api/issues',
+        analytics: '/api/analytics',
+        health: '/api/health'
+      },
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to generate API info', message: error.message });
+  }
 });
 
-// Routes
-app.use('/api', authRoutes);
-app.use('/api/employees', employeeRoutes);
-app.use('/api/shifts', shiftRoutes);
-app.use('/api/issues', issueRoutes);
-app.use('/api/analytics', analyticsRoutes);
+// Routes - only mount if loaded successfully
+if (authRoutes) app.use('/api', authRoutes);
+if (employeeRoutes) app.use('/api/employees', employeeRoutes);
+if (shiftRoutes) app.use('/api/shifts', shiftRoutes);
+if (issueRoutes) app.use('/api/issues', issueRoutes);
+if (analyticsRoutes) app.use('/api/analytics', analyticsRoutes);
 
 // Catch requests to root-level paths (like /login instead of /api/login)
 // This helps debug when frontend API_URL is missing /api
@@ -139,16 +155,29 @@ app.use((req, res) => {
 });
 
 // Error handler middleware (must be last)
-app.use(errorHandler);
+if (errorHandler) {
+  app.use(errorHandler);
+} else {
+  // Fallback error handler if module failed to load
+  app.use((err, req, res, next) => {
+    console.error('Unhandled error:', err);
+    res.status(500).json({ 
+      error: 'Internal server error',
+      message: err.message 
+    });
+  });
+}
 
-// For Vercel serverless - use serverless-http wrapper for better compatibility
-const serverless = require('serverless-http');
-module.exports = serverless(app);
+// CRITICAL: Export the app for Vercel serverless
+// According to latest Vercel docs, direct export is most robust
+module.exports = app;
 
-// For local development
+// For local development only
 if (require.main === module) {
-  connectDB();
   const PORT = process.env.PORT || 5000;
+  if (connectDB) {
+    connectDB();
+  }
   app.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT}`);
   });
