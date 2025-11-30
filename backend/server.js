@@ -34,9 +34,15 @@ app.use(express.urlencoded({ extended: true }));
 
 // root route
 app.get('/', (req, res) => {
+  const dbStatus = getDBStatus();
   res.json({
     message: 'Employee Shift Board API',
     version: '1.0.0',
+    status: dbStatus.connected ? 'online' : 'offline',
+    mongodb: {
+      connected: dbStatus.connected,
+      state: dbStatus.state
+    },
     endpoints: {
       health: '/api/health',
       login: '/api/login',
@@ -44,7 +50,8 @@ app.get('/', (req, res) => {
       shifts: '/api/shifts',
       issues: '/api/issues',
       analytics: '/api/analytics'
-    }
+    },
+    documentation: 'Visit /api/health for detailed system status'
   });
 });
 
@@ -54,39 +61,66 @@ app.get('/api/health', async (req, res) => {
   const mongoose = require('mongoose');
   
   let dbStats = null;
+  let collectionsInfo = [];
+  
   if (dbStatus.connected) {
     try {
       const db = mongoose.connection.db;
-      const adminDb = db.admin();
-      const serverStatus = await adminDb.serverStatus();
+      
+      // get collections
+      const collections = await db.listCollections().toArray();
+      collectionsInfo = collections.map(col => ({
+        name: col.name,
+        type: col.type || 'collection'
+      }));
+      
+      // get collection counts
+      const collectionCounts = {};
+      for (const col of collections) {
+        try {
+          collectionCounts[col.name] = await db.collection(col.name).countDocuments();
+        } catch (err) {
+          collectionCounts[col.name] = 'error';
+        }
+      }
       
       dbStats = {
         database: dbStatus.name,
         host: dbStatus.host,
-        collections: await db.listCollections().toArray().then(cols => cols.length),
-        uptime: serverStatus.uptime || 0,
-        version: serverStatus.version || 'unknown'
+        port: dbStatus.port,
+        collections: collections.length,
+        collectionsList: collectionsInfo,
+        documentCounts: collectionCounts
       };
     } catch (err) {
-      dbStats = { error: 'Could not fetch DB stats' };
+      dbStats = { 
+        error: 'Could not fetch DB stats',
+        errorMessage: err.message 
+      };
     }
   }
 
   res.json({
-    status: 'OK',
+    status: dbStatus.connected ? 'OK' : 'ERROR',
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || 'development',
     mongodb: {
       connected: dbStatus.connected,
       state: dbStatus.state,
+      readyState: dbStatus.readyState,
+      host: dbStatus.host,
+      database: dbStatus.name,
       ...dbStats
     },
     server: {
-      uptime: process.uptime(),
+      uptime: Math.round(process.uptime()) + ' seconds',
       memory: {
         used: Math.round(process.memoryUsage().heapUsed / 1024 / 1024) + ' MB',
-        total: Math.round(process.memoryUsage().heapTotal / 1024 / 1024) + ' MB'
-      }
+        total: Math.round(process.memoryUsage().heapTotal / 1024 / 1024) + ' MB',
+        rss: Math.round(process.memoryUsage().rss / 1024 / 1024) + ' MB'
+      },
+      nodeVersion: process.version,
+      platform: process.platform
     },
     endpoints: {
       health: '/api/health',
