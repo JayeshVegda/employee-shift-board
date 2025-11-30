@@ -40,41 +40,24 @@ const connectWithRetry = async () => {
   }
 };
 
-// Manual CORS middleware - ensures headers are always set
-app.use((req, res, next) => {
-  const origin = req.headers.origin;
-  res.header('Access-Control-Allow-Origin', origin || '*');
-  res.header('Access-Control-Allow-Credentials', 'true');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
-  res.header('Access-Control-Expose-Headers', 'Content-Range, X-Content-Range');
-  
-  // Handle preflight requests
-  if (req.method === 'OPTIONS') {
-    return res.status(204).end();
-  }
-  
-  next();
-});
-
-// CORS middleware using cors package (backup)
-const corsOptions = {
+// CORS - MUST be first middleware, before everything else
+// Using cors() with default options handles preflight automatically
+app.use(cors({
   origin: true, // Allow all origins
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
-  exposedHeaders: ['Content-Range', 'X-Content-Range'],
-  preflightContinue: false,
-  optionsSuccessStatus: 204
-};
+}));
 
-app.use(cors(corsOptions));
-
+// Parse JSON bodies
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Ensure database connection for serverless (non-blocking)
+// Ensure database connection for serverless (non-blocking, skip for OPTIONS)
 app.use(async (req, res, next) => {
+  // Skip database connection for OPTIONS preflight requests
+  if (req.method === 'OPTIONS') {
+    return next();
+  }
+  
   try {
     await connectWithRetry();
   } catch (error) {
@@ -84,12 +67,26 @@ app.use(async (req, res, next) => {
   next();
 });
 
+// Root level OPTIONS handler (catch-all for any path)
+app.options('*', cors());
+
 // Routes
 app.use('/api', authRoutes);
 app.use('/api/employees', employeeRoutes);
 app.use('/api/shifts', shiftRoutes);
 app.use('/api/issues', issueRoutes);
 app.use('/api/analytics', analyticsRoutes);
+
+// Catch requests to root-level paths (like /login instead of /api/login)
+// This helps debug when frontend API_URL is missing /api
+app.all(/^\/(login|employees|shifts|issues|analytics|health)/, (req, res) => {
+  res.status(404).json({ 
+    error: 'Route not found', 
+    path: req.path,
+    message: `Use /api${req.path} instead of ${req.path}`,
+    correctPath: `/api${req.path}`
+  });
+});
 
 // Health check (simple, no DB required)
 app.get('/api/health', (req, res) => {
@@ -114,12 +111,13 @@ app.get('/api/health/db', async (req, res) => {
   }
 });
 
-// 404 handler - ensure CORS headers are sent
+// 404 handler - CORS headers already set by cors() middleware
 app.use((req, res) => {
-  // Set CORS headers manually for 404 responses
-  res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
-  res.header('Access-Control-Allow-Credentials', 'true');
-  res.status(404).json({ error: 'Route not found', path: req.path });
+  res.status(404).json({ 
+    error: 'Route not found', 
+    path: req.path,
+    hint: req.path.startsWith('/api') ? 'Check the route path' : 'Routes should start with /api'
+  });
 });
 
 // Error handler middleware (must be last)
