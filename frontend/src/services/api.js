@@ -7,6 +7,7 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  withCredentials: true, // Include credentials (cookies, authorization headers) in CORS requests
 });
 
 // Request interceptor to add token

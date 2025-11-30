@@ -40,8 +40,16 @@ const connectWithRetry = async () => {
   }
 };
 
-// Middleware
-app.use(cors());
+// Middleware - CORS configuration
+// Allow all origins for Vercel deployment (frontend and backend on different domains)
+app.use(cors({
+  origin: true, // Allow all origins
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  exposedHeaders: ['Content-Range', 'X-Content-Range'],
+}));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
