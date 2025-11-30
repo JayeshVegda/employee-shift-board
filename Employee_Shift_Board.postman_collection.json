@@ -1,0 +1,328 @@
+{
+	"info": {
+		"_postman_id": "employee-shift-board-2025",
+		"name": "Employee Shift Board API",
+		"description": "API collection for Employee Shift Board application",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Authentication",
+			"item": [
+				{
+					"name": "Login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    const response = pm.response.json();",
+									"    pm.environment.set('token', response.token);",
+									"    pm.environment.set('userId', response.user.id);",
+									"    pm.environment.set('userRole', response.user.role);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"hire-me@anshumat.org\",\n    \"password\": \"HireMe@2025!\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/login",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"login"
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Employees",
+			"item": [
+				{
+					"name": "Get All Employees",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/employees",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"employees"
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Shifts",
+			"item": [
+				{
+					"name": "Create Shift",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"employeeId\": \"{{employeeId}}\",\n    \"date\": \"2025-01-15\",\n    \"startTime\": \"09:00\",\n    \"endTime\": \"17:00\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/shifts",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"shifts"
+							]
+						}
+					}
+				},
+				{
+					"name": "Get All Shifts",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/shifts",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"shifts"
+							]
+						}
+					}
+				},
+				{
+					"name": "Get Shifts by Employee",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/shifts?employee={{employeeId}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"shifts"
+							],
+							"query": [
+								{
+									"key": "employee",
+									"value": "{{employeeId}}"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Get Shifts by Date",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/shifts?date=2025-01-15",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"shifts"
+							],
+							"query": [
+								{
+									"key": "date",
+									"value": "2025-01-15"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Get Shifts by Employee and Date",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/shifts?employee={{employeeId}}&date=2025-01-15",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"shifts"
+							],
+							"query": [
+								{
+									"key": "employee",
+									"value": "{{employeeId}}"
+								},
+								{
+									"key": "date",
+									"value": "2025-01-15"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Delete Shift",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/shifts/:id",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"shifts",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "{{shiftId}}"
+								}
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Health Check",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:5000/api/health",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "5000",
+					"path": [
+						"api",
+						"health"
+					]
+				}
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:5000/api",
+			"type": "string"
+		},
+		{
+			"key": "token",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "employeeId",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "shiftId",
+			"value": "",
+			"type": "string"
+		}
+	]
+}
+
