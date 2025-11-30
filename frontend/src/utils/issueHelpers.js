@@ -54,3 +54,5 @@ export const truncateText = (text, maxLength = 50) => {
   return text.substring(0, maxLength) + '...';
 };
 
+
+

@@ -13,12 +13,12 @@ const shiftSchema = new mongoose.Schema({
   startTime: {
     type: String,
     required: [true, 'Start time is required'],
-    match: [/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, 'Invalid time format (use HH:mm)'],
+    match: [/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, 'Please enter a valid time in HH:mm format'],
   },
   endTime: {
     type: String,
     required: [true, 'End time is required'],
-    match: [/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, 'Invalid time format (use HH:mm)'],
+    match: [/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, 'Please enter a valid time in HH:mm format'],
   },
 }, {
   timestamps: true,

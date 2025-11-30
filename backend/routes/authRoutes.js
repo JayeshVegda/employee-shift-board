@@ -1,12 +1,8 @@
 const express = require('express');
 const router = express.Router();
-const { login, loginEmployee, loginAdmin, changePassword } = require('../controllers/authController');
-const authMiddleware = require('../middleware/authMiddleware');
+const { login } = require('../controllers/authController');
 
-router.post('/employee', loginEmployee);
-router.post('/admin', loginAdmin);
-router.post('/', login); // backward compat
-router.post('/change-password', authMiddleware, changePassword);
+router.post('/login', login);
 
 module.exports = router;
 

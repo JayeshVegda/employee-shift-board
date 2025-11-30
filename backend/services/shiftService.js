@@ -1,12 +1,16 @@
 const Shift = require('../models/Shift');
 
-// convert time string to minutes
+/**
+ * Convert time string (HH:mm) to minutes since midnight
+ */
 const timeToMinutes = (timeStr) => {
   const [hours, minutes] = timeStr.split(':').map(Number);
   return hours * 60 + minutes;
 };
 
-// check if two time ranges overlap
+/**
+ * Check if two time ranges overlap
+ */
 const doTimesOverlap = (start1, end1, start2, end2) => {
   const start1Min = timeToMinutes(start1);
   const end1Min = timeToMinutes(end1);
@@ -16,28 +20,32 @@ const doTimesOverlap = (start1, end1, start2, end2) => {
   return start1Min < end2Min && start2Min < end1Min;
 };
 
-// calculate duration in hours
+/**
+ * Calculate duration in hours
+ */
 const calculateDuration = (startTime, endTime) => {
   const startMin = timeToMinutes(startTime);
   const endMin = timeToMinutes(endTime);
   return (endMin - startMin) / 60;
 };
 
-// validate shift rules
+/**
+ * Validate shift business rules
+ */
 const validateShiftRules = async (employeeId, date, startTime, endTime, excludeShiftId = null) => {
   const errors = [];
 
-  // minimum 4 hours
+  // Rule 1: Minimum shift duration = 4 hours
   const duration = calculateDuration(startTime, endTime);
   if (duration < 4) {
-    errors.push('Shift must be at least 4 hours');
+    errors.push('Shift duration must be at least 4 hours');
   }
 
-  // check for overlaps
-  const dateObj = new Date(date);
-  const dateStart = new Date(dateObj);
+  // Rule 2: No overlapping shifts
+  // Normalize date to start of day for comparison
+  const dateStart = new Date(date);
   dateStart.setHours(0, 0, 0, 0);
-  const dateEnd = new Date(dateObj);
+  const dateEnd = new Date(date);
   dateEnd.setHours(23, 59, 59, 999);
 
   const existingShifts = await Shift.find({
@@ -48,13 +56,13 @@ const validateShiftRules = async (employeeId, date, startTime, endTime, excludeS
     },
   });
 
-  // exclude current shift if updating
+  // Filter out the current shift if updating
   const shiftsToCheck = excludeShiftId
     ? existingShifts.filter(shift => shift._id.toString() !== excludeShiftId)
     : existingShifts;
 
   for (const existingShift of shiftsToCheck) {
-    // check if same day
+    // Check if dates are the same day
     const existingDate = new Date(existingShift.date);
     const newDate = new Date(date);
     
@@ -63,9 +71,9 @@ const validateShiftRules = async (employeeId, date, startTime, endTime, excludeS
       existingDate.getMonth() === newDate.getMonth() &&
       existingDate.getDate() === newDate.getDate()
     ) {
-      // same day, check overlap
+      // Same day, check for overlap
       if (doTimesOverlap(startTime, endTime, existingShift.startTime, existingShift.endTime)) {
-        errors.push('Shift overlaps with existing shift');
+        errors.push('Shift overlaps with an existing shift on the same date');
         break;
       }
     }
@@ -82,3 +90,4 @@ module.exports = {
   calculateDuration,
   doTimesOverlap,
 };
+
