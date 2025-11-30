@@ -10,6 +10,16 @@ export const getEmployees = async () => {
   return response.data;
 };
 
+export const createEmployee = async (employeeData) => {
+  const response = await api.post('/employees', employeeData);
+  return response.data;
+};
+
+export const updateEmployee = async (id, employeeData) => {
+  const response = await api.put(`/employees/${id}`, employeeData);
+  return response.data;
+};
+
 export const getShifts = async (employee = null, date = null) => {
   const params = {};
   if (employee) params.employee = employee;
