@@ -141,8 +141,9 @@ app.use((req, res) => {
 // Error handler middleware (must be last)
 app.use(errorHandler);
 
-// For Vercel serverless - wrap in try-catch to handle initialization errors
-module.exports = app;
+// For Vercel serverless - use serverless-http wrapper for better compatibility
+const serverless = require('serverless-http');
+module.exports = serverless(app);
 
 // For local development
 if (require.main === module) {
