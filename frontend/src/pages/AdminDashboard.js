@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { getDashboardAnalytics, getUnreadIssueCount } from '../services/authService';
+import { getDashboardAnalytics, getUnreadIssueCount, getEmployees } from '../services/authService';
 import {
   LineChart,
   Line,
@@ -23,11 +23,16 @@ const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'
 
 const AdminDashboard = () => {
   const [analytics, setAnalytics] = useState(null);
+  const [employees, setEmployees] = useState([]);
   const [unreadIssues, setUnreadIssues] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [filterDepartment, setFilterDepartment] = useState('');
+  const [filterEmployee, setFilterEmployee] = useState('');
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
+  const [searchQuery, setSearchQuery] = useState('');
   const navigate = useNavigate();
 
   const user = JSON.parse(localStorage.getItem('user') || '{}');
@@ -40,6 +45,7 @@ const AdminDashboard = () => {
     }
     fetchAnalytics();
     fetchUnreadIssues();
+    fetchEmployees();
     
     // Poll for unread issues every 30 seconds
     const interval = setInterval(() => {
@@ -47,7 +53,7 @@ const AdminDashboard = () => {
     }, 30000);
     
     return () => clearInterval(interval);
-  }, [isAdmin, startDate, endDate]);
+  }, [isAdmin, startDate, endDate, filterDepartment, filterEmployee]);
 
   const fetchAnalytics = async () => {
     setLoading(true);
@@ -72,10 +78,81 @@ const AdminDashboard = () => {
     }
   };
 
+  const fetchEmployees = async () => {
+    try {
+      const data = await getEmployees();
+      setEmployees(data);
+    } catch (err) {
+      console.error('Error fetching employees:', err);
+    }
+  };
+
+  const handleSort = (key) => {
+    let direction = 'asc';
+    if (sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const sortedEmployeePerformance = useMemo(() => {
+    if (!analytics?.employeePerformance) return [];
+    
+    let sorted = [...analytics.employeePerformance];
+    
+    // Apply filters
+    if (filterDepartment) {
+      sorted = sorted.filter(emp => emp.department === filterDepartment);
+    }
+    if (filterEmployee) {
+      sorted = sorted.filter(emp => emp.employeeId === filterEmployee);
+    }
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      sorted = sorted.filter(emp => 
+        emp.name.toLowerCase().includes(query) ||
+        emp.employeeCode.toLowerCase().includes(query) ||
+        emp.department.toLowerCase().includes(query)
+      );
+    }
+    
+    // Apply sorting
+    if (sortConfig.key) {
+      sorted.sort((a, b) => {
+        let aVal = a[sortConfig.key];
+        let bVal = b[sortConfig.key];
+        
+        if (typeof aVal === 'string') {
+          aVal = aVal.toLowerCase();
+          bVal = bVal.toLowerCase();
+        }
+        
+        if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
+        if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+    
+    return sorted;
+  }, [analytics?.employeePerformance, filterDepartment, filterEmployee, searchQuery, sortConfig]);
+
+  const departments = useMemo(() => {
+    if (!analytics?.departmentPerformance) return [];
+    return analytics.departmentPerformance.map(dept => dept.department);
+  }, [analytics?.departmentPerformance]);
+
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     navigate('/login');
+  };
+
+  const clearFilters = () => {
+    setStartDate('');
+    setEndDate('');
+    setFilterDepartment('');
+    setFilterEmployee('');
+    setSearchQuery('');
   };
 
   if (!isAdmin) {
@@ -105,23 +182,51 @@ const AdminDashboard = () => {
     return null;
   }
 
+  // Calculate employee performance KPIs
+  const employeeKPIs = useMemo(() => {
+    if (!analytics?.employeePerformance || analytics.employeePerformance.length === 0) {
+      return { highestHours: null, lowestHours: null, bestAvgHours: null };
+    }
+    
+    const sortedByHours = [...analytics.employeePerformance].sort((a, b) => b.totalHours - a.totalHours);
+    const sortedByAvgHours = [...analytics.employeePerformance].sort((a, b) => 
+      parseFloat(b.avgHoursPerShift) - parseFloat(a.avgHoursPerShift)
+    );
+    
+    return {
+      highestHours: sortedByHours[0],
+      lowestHours: sortedByHours[sortedByHours.length - 1],
+      bestAvgHours: sortedByAvgHours[0],
+    };
+  }, [analytics?.employeePerformance]);
+
+  const SortIcon = ({ columnKey }) => {
+    if (sortConfig.key !== columnKey) {
+      return <span className="text-gray-400">↕️</span>;
+    }
+    return sortConfig.direction === 'asc' ? <span>↑</span> : <span>↓</span>;
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white shadow-sm">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
+      {/* 1. Top Navigation */}
+      <nav className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16 items-center">
-            <h1 className="text-xl font-bold text-gray-900">Admin Dashboard</h1>
+            <div className="flex items-center">
+              <h1 className="text-xl font-bold text-gray-900">Employee Shift Board</h1>
+            </div>
             <div className="flex items-center gap-4">
-              <Link to="/admin-dashboard" className="text-sm text-blue-600 hover:text-blue-800 font-semibold">
-                Analytics
+              <Link to="/admin-dashboard" className="text-sm text-blue-600 hover:text-blue-800 font-semibold border-b-2 border-blue-600 pb-1">
+                Dashboard
               </Link>
-              <Link to="/dashboard" className="text-sm text-blue-600 hover:text-blue-800">
+              <Link to="/dashboard" className="text-sm text-gray-600 hover:text-gray-800">
                 Shifts
               </Link>
-              <Link to="/employees" className="text-sm text-blue-600 hover:text-blue-800">
+              <Link to="/employees" className="text-sm text-gray-600 hover:text-gray-800">
                 Employees
               </Link>
-              <Link to="/issues" className="relative text-sm text-blue-600 hover:text-blue-800">
+              <Link to="/issues" className="relative text-sm text-gray-600 hover:text-gray-800">
                 Issues
                 {unreadIssues > 0 && (
                   <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
@@ -129,312 +234,403 @@ const AdminDashboard = () => {
                   </span>
                 )}
               </Link>
-              <Link to="/settings" className="text-sm text-blue-600 hover:text-blue-800">
+              <Link to="/settings" className="text-sm text-gray-600 hover:text-gray-800">
                 Settings
               </Link>
-              <span className="text-sm text-gray-600">
-                {user.email} ({user.role})
-              </span>
-              <Button onClick={handleLogout} variant="secondary">
-                Logout
-              </Button>
+              <div className="ml-4 pl-4 border-l border-gray-300">
+                <span className="text-sm text-gray-600">{user.email}</span>
+                <Button onClick={handleLogout} variant="secondary" className="ml-2">
+                  Logout
+                </Button>
+              </div>
             </div>
           </div>
         </div>
       </nav>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Quick Access Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          <Link to="/employees" className="bg-white shadow rounded-lg p-6 hover:shadow-lg transition-shadow cursor-pointer">
-            <div className="flex items-center justify-between">
+      <div className="flex-1">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          {/* 2. Header KPIs */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+            <div className="bg-white shadow rounded-lg p-6 border-l-4 border-blue-500">
+              <h3 className="text-sm font-medium text-gray-500">Total Employees</h3>
+              <p className="text-3xl font-bold text-gray-900 mt-2">{analytics.summary.totalEmployees}</p>
+            </div>
+            <div className="bg-white shadow rounded-lg p-6 border-l-4 border-orange-500">
+              <h3 className="text-sm font-medium text-gray-500">Open Issues</h3>
+              <p className="text-3xl font-bold text-gray-900 mt-2">{unreadIssues}</p>
+            </div>
+            <div className="bg-white shadow rounded-lg p-6 border-l-4 border-green-500">
+              <h3 className="text-sm font-medium text-gray-500">Total Shifts</h3>
+              <p className="text-3xl font-bold text-gray-900 mt-2">{analytics.summary.totalShifts}</p>
+            </div>
+            <div className="bg-white shadow rounded-lg p-6 border-l-4 border-purple-500">
+              <h3 className="text-sm font-medium text-gray-500">Total Hours</h3>
+              <p className="text-3xl font-bold text-gray-900 mt-2">{analytics.summary.totalHours}</p>
+            </div>
+            <div className="bg-white shadow rounded-lg p-6 border-l-4 border-indigo-500">
+              <h3 className="text-sm font-medium text-gray-500">Avg Hours/Employee</h3>
+              <p className="text-3xl font-bold text-gray-900 mt-2">{analytics.summary.avgHoursPerEmployee}</p>
+            </div>
+          </div>
+
+          {/* 3. Filters Section */}
+          <div className="bg-white shadow rounded-lg p-6 mb-6">
+            <h2 className="text-lg font-semibold mb-4">Filters</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
               <div>
-                <h3 className="text-sm font-medium text-gray-500">Employee Management</h3>
-                <p className="text-2xl font-bold text-gray-900 mt-2">{analytics?.summary.totalEmployees || 0}</p>
-                <p className="text-xs text-gray-500 mt-1">Total Employees</p>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
+                <Input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                />
               </div>
-              <div className="text-blue-500 text-3xl">👥</div>
-            </div>
-          </Link>
-
-          <Link to="/issues" className="bg-white shadow rounded-lg p-6 hover:shadow-lg transition-shadow cursor-pointer relative">
-            <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-sm font-medium text-gray-500">Issues</h3>
-                <p className="text-2xl font-bold text-gray-900 mt-2">{unreadIssues}</p>
-                <p className="text-xs text-gray-500 mt-1">Unread Issues</p>
+                <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
+                <Input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                />
               </div>
-              <div className="text-orange-500 text-3xl">⚠️</div>
-            </div>
-            {unreadIssues > 0 && (
-              <span className="absolute top-2 right-2 bg-red-500 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center">
-                {unreadIssues}
-              </span>
-            )}
-          </Link>
-
-          <Link to="/settings" className="bg-white shadow rounded-lg p-6 hover:shadow-lg transition-shadow cursor-pointer">
-            <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-sm font-medium text-gray-500">Settings</h3>
-                <p className="text-sm text-gray-600 mt-2">Account & Preferences</p>
-              </div>
-              <div className="text-gray-500 text-3xl">⚙️</div>
-            </div>
-          </Link>
-
-          <div className="bg-white shadow rounded-lg p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-medium text-gray-500">Analytics</h3>
-                <p className="text-sm text-gray-600 mt-2">View Reports</p>
-              </div>
-              <div className="text-green-500 text-3xl">📊</div>
-            </div>
-          </div>
-        </div>
-
-        {/* Date Range Filter */}
-        <div className="bg-white shadow rounded-lg p-6 mb-6">
-          <h2 className="text-lg font-semibold mb-4">Date Range Filter</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Input
-              label="Start Date"
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-            />
-            <Input
-              label="End Date"
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-            />
-            <div className="flex items-end">
-              <Button onClick={() => { setStartDate(''); setEndDate(''); }} variant="secondary">
-                Clear Filter
-              </Button>
-            </div>
-          </div>
-        </div>
-
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
-          <div className="bg-white shadow rounded-lg p-6">
-            <h3 className="text-sm font-medium text-gray-500">Total Employees</h3>
-            <p className="text-3xl font-bold text-gray-900 mt-2">{analytics.summary.totalEmployees}</p>
-          </div>
-          <div className="bg-white shadow rounded-lg p-6">
-            <h3 className="text-sm font-medium text-gray-500">Total Shifts</h3>
-            <p className="text-3xl font-bold text-gray-900 mt-2">{analytics.summary.totalShifts}</p>
-          </div>
-          <div className="bg-white shadow rounded-lg p-6">
-            <h3 className="text-sm font-medium text-gray-500">Total Hours</h3>
-            <p className="text-3xl font-bold text-gray-900 mt-2">{analytics.summary.totalHours}</p>
-          </div>
-          <div className="bg-white shadow rounded-lg p-6">
-            <h3 className="text-sm font-medium text-gray-500">Avg Hours/Shift</h3>
-            <p className="text-3xl font-bold text-gray-900 mt-2">{analytics.summary.avgHoursPerShift}</p>
-          </div>
-          <div className="bg-white shadow rounded-lg p-6">
-            <h3 className="text-sm font-medium text-gray-500">Avg Hours/Employee</h3>
-            <p className="text-3xl font-bold text-gray-900 mt-2">{analytics.summary.avgHoursPerEmployee}</p>
-          </div>
-        </div>
-
-        {/* Charts Row 1 */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          {/* Daily Hours Trend */}
-          <div className="bg-white shadow rounded-lg p-6">
-            <h3 className="text-lg font-semibold mb-4">Daily Hours Trend</h3>
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={analytics.trends.daily}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" tick={{ fontSize: 12 }} />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                <Line type="monotone" dataKey="hours" stroke="#0088FE" strokeWidth={2} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-
-          {/* Weekly Hours Trend */}
-          <div className="bg-white shadow rounded-lg p-6">
-            <h3 className="text-lg font-semibold mb-4">Weekly Hours Trend</h3>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={analytics.trends.weekly}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" tick={{ fontSize: 12 }} />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                <Bar dataKey="hours" fill="#00C49F" />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* Charts Row 2 */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          {/* Department Performance */}
-          <div className="bg-white shadow rounded-lg p-6">
-            <h3 className="text-lg font-semibold mb-4">Department Performance</h3>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={analytics.departmentPerformance}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="department" tick={{ fontSize: 12 }} />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                <Bar dataKey="totalHours" fill="#FFBB28" />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-
-          {/* Issues Distribution */}
-          <div className="bg-white shadow rounded-lg p-6">
-            <h3 className="text-lg font-semibold mb-4">Issues Distribution</h3>
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={[
-                    { name: 'Open', value: analytics.issues.open },
-                    { name: 'Resolved', value: analytics.issues.resolved },
-                    { name: 'Closed', value: analytics.issues.closed },
-                  ]}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                  outerRadius={80}
-                  fill="#8884d8"
-                  dataKey="value"
+                <label className="block text-sm font-medium text-gray-700 mb-1">Department</label>
+                <select
+                  value={filterDepartment}
+                  onChange={(e) => setFilterDepartment(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
-                  {[
-                    { name: 'Open', value: analytics.issues.open },
-                    { name: 'Resolved', value: analytics.issues.resolved },
-                    { name: 'Closed', value: analytics.issues.closed },
-                  ].map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  <option value="">All Departments</option>
+                  {departments.map((dept) => (
+                    <option key={dept} value={dept}>{dept}</option>
                   ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* Employee Performance Table */}
-        <div className="bg-white shadow rounded-lg p-6 mb-6">
-          <h3 className="text-lg font-semibold mb-4">Employee Performance</h3>
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Employee
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Department
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Total Shifts
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Total Hours
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Days Worked
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Avg Hours/Shift
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {analytics.employeePerformance.map((emp) => (
-                  <tr key={emp.employeeId} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Employee</label>
+                <select
+                  value={filterEmployee}
+                  onChange={(e) => setFilterEmployee(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">All Employees</option>
+                  {employees.map((emp) => (
+                    <option key={emp._id} value={emp._id}>
                       {emp.name} ({emp.employeeCode})
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {emp.department}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {emp.totalShifts}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {emp.totalHours.toFixed(2)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {emp.daysWorked}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {emp.avgHoursPerShift}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex items-end">
+                <Button onClick={clearFilters} variant="secondary" className="w-full">
+                  Clear All Filters
+                </Button>
+              </div>
+            </div>
           </div>
-        </div>
 
-        {/* Department Performance Table */}
-        <div className="bg-white shadow rounded-lg p-6">
-          <h3 className="text-lg font-semibold mb-4">Department Performance</h3>
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Department
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Employees
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Total Shifts
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Total Hours
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Avg Hours/Employee
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {analytics.departmentPerformance.map((dept, index) => (
-                  <tr key={index} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      {dept.department}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {dept.employeeCount}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {dept.totalShifts}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {parseFloat(dept.totalHours).toFixed(2)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {dept.avgHoursPerEmployee}
-                    </td>
+          {/* 4. Analytics Section */}
+          <div className="mb-6">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">Insights & Trends</h2>
+            
+            {/* Row 1: Time-Based Analysis */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+              <div className="bg-white shadow rounded-lg p-6">
+                <h3 className="text-lg font-semibold mb-4">Daily Hours Trend</h3>
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={analytics.trends.daily}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="date" tick={{ fontSize: 12 }} />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Line type="monotone" dataKey="hours" stroke="#0088FE" strokeWidth={2} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+
+              <div className="bg-white shadow rounded-lg p-6">
+                <h3 className="text-lg font-semibold mb-4">Weekly Hours Trend</h3>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={analytics.trends.weekly}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="date" tick={{ fontSize: 12 }} />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Bar dataKey="hours" fill="#00C49F" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* Row 2: Department & Issues */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="bg-white shadow rounded-lg p-6">
+                <h3 className="text-lg font-semibold mb-4">Department Performance</h3>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={analytics.departmentPerformance}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="department" tick={{ fontSize: 12 }} />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Bar dataKey="totalHours" fill="#FFBB28" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+
+              <div className="bg-white shadow rounded-lg p-6">
+                <h3 className="text-lg font-semibold mb-4">Issues Distribution</h3>
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie
+                      data={[
+                        { name: 'Open', value: analytics.issues.open },
+                        { name: 'Resolved', value: analytics.issues.resolved },
+                        { name: 'Closed', value: analytics.issues.closed },
+                      ]}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                      outerRadius={80}
+                      fill="#8884d8"
+                      dataKey="value"
+                    >
+                      {[
+                        { name: 'Open', value: analytics.issues.open },
+                        { name: 'Resolved', value: analytics.issues.resolved },
+                        { name: 'Closed', value: analytics.issues.closed },
+                      ].map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          </div>
+
+          {/* 5. Employee Performance Section */}
+          <div className="mb-6">
+            <div className="bg-white shadow rounded-lg p-6 mb-4">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-semibold text-gray-900">Employee Performance</h2>
+                <div className="w-64">
+                  <Input
+                    type="text"
+                    placeholder="Search employees..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              {/* Performance Summary KPIs */}
+              {employeeKPIs.highestHours && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <p className="text-sm text-gray-600">Highest Hours</p>
+                    <p className="text-lg font-semibold text-gray-900">
+                      {employeeKPIs.highestHours.name} ({employeeKPIs.highestHours.totalHours.toFixed(2)} hrs)
+                    </p>
+                  </div>
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                    <p className="text-sm text-gray-600">Best Avg Hours/Shift</p>
+                    <p className="text-lg font-semibold text-gray-900">
+                      {employeeKPIs.bestAvgHours.name} ({employeeKPIs.bestAvgHours.avgHoursPerShift} hrs)
+                    </p>
+                  </div>
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                    <p className="text-sm text-gray-600">Lowest Hours</p>
+                    <p className="text-lg font-semibold text-gray-900">
+                      {employeeKPIs.lowestHours.name} ({employeeKPIs.lowestHours.totalHours.toFixed(2)} hrs)
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Employee Performance Table */}
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50 sticky top-0">
+                    <tr>
+                      <th 
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                        onClick={() => handleSort('name')}
+                      >
+                        <div className="flex items-center gap-2">
+                          Employee <SortIcon columnKey="name" />
+                        </div>
+                      </th>
+                      <th 
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                        onClick={() => handleSort('department')}
+                      >
+                        <div className="flex items-center gap-2">
+                          Department <SortIcon columnKey="department" />
+                        </div>
+                      </th>
+                      <th 
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                        onClick={() => handleSort('totalShifts')}
+                      >
+                        <div className="flex items-center gap-2">
+                          Total Shifts <SortIcon columnKey="totalShifts" />
+                        </div>
+                      </th>
+                      <th 
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                        onClick={() => handleSort('totalHours')}
+                      >
+                        <div className="flex items-center gap-2">
+                          Total Hours <SortIcon columnKey="totalHours" />
+                        </div>
+                      </th>
+                      <th 
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                        onClick={() => handleSort('daysWorked')}
+                      >
+                        <div className="flex items-center gap-2">
+                          Days Worked <SortIcon columnKey="daysWorked" />
+                        </div>
+                      </th>
+                      <th 
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                        onClick={() => handleSort('avgHoursPerShift')}
+                      >
+                        <div className="flex items-center gap-2">
+                          Avg Hours/Shift <SortIcon columnKey="avgHoursPerShift" />
+                        </div>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {sortedEmployeePerformance.length === 0 ? (
+                      <tr>
+                        <td colSpan="6" className="px-6 py-4 text-center text-gray-500">
+                          No employees found
+                        </td>
+                      </tr>
+                    ) : (
+                      sortedEmployeePerformance.map((emp) => (
+                        <tr key={emp.employeeId} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                            {emp.name} ({emp.employeeCode})
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {emp.department}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {emp.totalShifts}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {emp.totalHours.toFixed(2)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {emp.daysWorked}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {emp.avgHoursPerShift}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          {/* 6. Department Performance Table */}
+          <div className="bg-white shadow rounded-lg p-6 mb-6">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">Department Performance</h2>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Department
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      No. of Employees
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Total Shifts
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Total Hours
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Avg Hours/Employee
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {analytics.departmentPerformance.map((dept, index) => (
+                    <tr key={index} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        {dept.department}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {dept.employeeCount}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {dept.totalShifts}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {parseFloat(dept.totalHours).toFixed(2)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {dept.avgHoursPerEmployee}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* 7. Issues Overview (Optional Block) */}
+          <div className="bg-white shadow rounded-lg p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold text-gray-900">Issues Overview</h2>
+              <Link to="/issues">
+                <Button variant="secondary">View All Issues</Button>
+              </Link>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                <p className="text-sm text-gray-600">Open Issues</p>
+                <p className="text-2xl font-bold text-gray-900">{analytics.issues.open}</p>
+              </div>
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                <p className="text-sm text-gray-600">Resolved Issues</p>
+                <p className="text-2xl font-bold text-gray-900">{analytics.issues.resolved}</p>
+              </div>
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                <p className="text-sm text-gray-600">Closed Issues</p>
+                <p className="text-2xl font-bold text-gray-900">{analytics.issues.closed}</p>
+              </div>
+            </div>
           </div>
         </div>
       </div>
+
+      {/* 8. Footer */}
+      <footer className="bg-white border-t mt-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="flex justify-between items-center text-sm text-gray-500">
+            <p>© 2025 Employee Shift Board. All rights reserved.</p>
+            <p>Version 1.0.0</p>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 };
 
 export default AdminDashboard;
-
-
-
-
