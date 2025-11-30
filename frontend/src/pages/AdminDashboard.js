@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { getDashboardAnalytics } from '../services/authService';
+import { getDashboardAnalytics, getUnreadIssueCount } from '../services/authService';
 import {
   LineChart,
   Line,
@@ -23,6 +23,7 @@ const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'
 
 const AdminDashboard = () => {
   const [analytics, setAnalytics] = useState(null);
+  const [unreadIssues, setUnreadIssues] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [startDate, setStartDate] = useState('');
@@ -38,6 +39,14 @@ const AdminDashboard = () => {
       return;
     }
     fetchAnalytics();
+    fetchUnreadIssues();
+    
+    // Poll for unread issues every 30 seconds
+    const interval = setInterval(() => {
+      fetchUnreadIssues();
+    }, 30000);
+    
+    return () => clearInterval(interval);
   }, [isAdmin, startDate, endDate]);
 
   const fetchAnalytics = async () => {
@@ -51,6 +60,15 @@ const AdminDashboard = () => {
       console.error('Error fetching analytics:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchUnreadIssues = async () => {
+    try {
+      const data = await getUnreadIssueCount();
+      setUnreadIssues(data.count || 0);
+    } catch (err) {
+      console.error('Error fetching unread issues:', err);
     }
   };
 
@@ -94,14 +112,22 @@ const AdminDashboard = () => {
           <div className="flex justify-between h-16 items-center">
             <h1 className="text-xl font-bold text-gray-900">Admin Dashboard</h1>
             <div className="flex items-center gap-4">
+              <Link to="/admin-dashboard" className="text-sm text-blue-600 hover:text-blue-800 font-semibold">
+                Analytics
+              </Link>
               <Link to="/dashboard" className="text-sm text-blue-600 hover:text-blue-800">
                 Shifts
               </Link>
               <Link to="/employees" className="text-sm text-blue-600 hover:text-blue-800">
                 Employees
               </Link>
-              <Link to="/issues" className="text-sm text-blue-600 hover:text-blue-800">
+              <Link to="/issues" className="relative text-sm text-blue-600 hover:text-blue-800">
                 Issues
+                {unreadIssues > 0 && (
+                  <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                    {unreadIssues}
+                  </span>
+                )}
               </Link>
               <Link to="/settings" className="text-sm text-blue-600 hover:text-blue-800">
                 Settings
@@ -118,6 +144,56 @@ const AdminDashboard = () => {
       </nav>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Quick Access Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <Link to="/employees" className="bg-white shadow rounded-lg p-6 hover:shadow-lg transition-shadow cursor-pointer">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-medium text-gray-500">Employee Management</h3>
+                <p className="text-2xl font-bold text-gray-900 mt-2">{analytics?.summary.totalEmployees || 0}</p>
+                <p className="text-xs text-gray-500 mt-1">Total Employees</p>
+              </div>
+              <div className="text-blue-500 text-3xl">👥</div>
+            </div>
+          </Link>
+
+          <Link to="/issues" className="bg-white shadow rounded-lg p-6 hover:shadow-lg transition-shadow cursor-pointer relative">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-medium text-gray-500">Issues</h3>
+                <p className="text-2xl font-bold text-gray-900 mt-2">{unreadIssues}</p>
+                <p className="text-xs text-gray-500 mt-1">Unread Issues</p>
+              </div>
+              <div className="text-orange-500 text-3xl">⚠️</div>
+            </div>
+            {unreadIssues > 0 && (
+              <span className="absolute top-2 right-2 bg-red-500 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center">
+                {unreadIssues}
+              </span>
+            )}
+          </Link>
+
+          <Link to="/settings" className="bg-white shadow rounded-lg p-6 hover:shadow-lg transition-shadow cursor-pointer">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-medium text-gray-500">Settings</h3>
+                <p className="text-sm text-gray-600 mt-2">Account & Preferences</p>
+              </div>
+              <div className="text-gray-500 text-3xl">⚙️</div>
+            </div>
+          </Link>
+
+          <div className="bg-white shadow rounded-lg p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-medium text-gray-500">Analytics</h3>
+                <p className="text-sm text-gray-600 mt-2">View Reports</p>
+              </div>
+              <div className="text-green-500 text-3xl">📊</div>
+            </div>
+          </div>
+        </div>
+
         {/* Date Range Filter */}
         <div className="bg-white shadow rounded-lg p-6 mb-6">
           <h2 className="text-lg font-semibold mb-4">Date Range Filter</h2>
