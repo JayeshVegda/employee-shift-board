@@ -95,6 +95,7 @@ const AdminDashboard = () => {
     setSortConfig({ key, direction });
   };
 
+  // All useMemo hooks must be called before any conditional returns
   const sortedEmployeePerformance = useMemo(() => {
     if (!analytics?.employeePerformance) return [];
     
@@ -141,6 +142,24 @@ const AdminDashboard = () => {
     return analytics.departmentPerformance.map(dept => dept.department);
   }, [analytics?.departmentPerformance]);
 
+  // Calculate employee performance KPIs
+  const employeeKPIs = useMemo(() => {
+    if (!analytics?.employeePerformance || analytics.employeePerformance.length === 0) {
+      return { highestHours: null, lowestHours: null, bestAvgHours: null };
+    }
+    
+    const sortedByHours = [...analytics.employeePerformance].sort((a, b) => b.totalHours - a.totalHours);
+    const sortedByAvgHours = [...analytics.employeePerformance].sort((a, b) => 
+      parseFloat(b.avgHoursPerShift) - parseFloat(a.avgHoursPerShift)
+    );
+    
+    return {
+      highestHours: sortedByHours[0],
+      lowestHours: sortedByHours[sortedByHours.length - 1],
+      bestAvgHours: sortedByAvgHours[0],
+    };
+  }, [analytics?.employeePerformance]);
+
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
@@ -181,24 +200,6 @@ const AdminDashboard = () => {
   if (!analytics) {
     return null;
   }
-
-  // Calculate employee performance KPIs
-  const employeeKPIs = useMemo(() => {
-    if (!analytics?.employeePerformance || analytics.employeePerformance.length === 0) {
-      return { highestHours: null, lowestHours: null, bestAvgHours: null };
-    }
-    
-    const sortedByHours = [...analytics.employeePerformance].sort((a, b) => b.totalHours - a.totalHours);
-    const sortedByAvgHours = [...analytics.employeePerformance].sort((a, b) => 
-      parseFloat(b.avgHoursPerShift) - parseFloat(a.avgHoursPerShift)
-    );
-    
-    return {
-      highestHours: sortedByHours[0],
-      lowestHours: sortedByHours[sortedByHours.length - 1],
-      bestAvgHours: sortedByAvgHours[0],
-    };
-  }, [analytics?.employeePerformance]);
 
   const SortIcon = ({ columnKey }) => {
     if (sortConfig.key !== columnKey) {
