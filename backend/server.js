@@ -70,6 +70,24 @@ app.use(async (req, res, next) => {
 // Root level OPTIONS handler (catch-all for any path)
 app.options('*', cors());
 
+// Root API endpoint - returns API information
+app.get('/api', (req, res) => {
+  res.json({
+    name: 'Employee Shift Board API',
+    version: '1.0.0',
+    status: 'running',
+    endpoints: {
+      auth: '/api/login',
+      employees: '/api/employees',
+      shifts: '/api/shifts',
+      issues: '/api/issues',
+      analytics: '/api/analytics',
+      health: '/api/health'
+    },
+    timestamp: new Date().toISOString()
+  });
+});
+
 // Routes
 app.use('/api', authRoutes);
 app.use('/api/employees', employeeRoutes);
