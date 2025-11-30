@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { changePassword } from '../services/authService';
+import AdminLayout from '../components/AdminLayout';
 import Input from '../components/Input';
 import Button from '../components/Button';
 
@@ -15,8 +16,6 @@ const Settings = () => {
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
   const navigate = useNavigate();
-
-  const user = JSON.parse(localStorage.getItem('user') || '{}');
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -76,86 +75,65 @@ const Settings = () => {
     }
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    navigate('/login');
-  };
-
   return (
-    <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16 items-center">
-            <h1 className="text-xl font-bold text-gray-900">Employee Shift Board</h1>
-            <div className="flex items-center gap-4">
-              <Link to="/dashboard" className="text-sm text-blue-600 hover:text-blue-800">
-                Dashboard
-              </Link>
-              <span className="text-sm text-gray-600">
-                {user.email} ({user.role})
-              </span>
-              <Button onClick={handleLogout} variant="secondary">
-                Logout
-              </Button>
-            </div>
-          </div>
-        </div>
-      </nav>
-
-      <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <AdminLayout 
+      title="Settings" 
+      subtitle="Manage your admin account preferences"
+      currentPath="/settings"
+    >
+      <div className="max-w-2xl">
         <div className="bg-white shadow rounded-lg p-6">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">Settings</h2>
-
           {error && (
-            <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+            <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
               {error}
             </div>
           )}
 
           {success && (
-            <div className="mb-4 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded">
+            <div className="mb-6 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded">
               {success}
             </div>
           )}
 
           <form onSubmit={handleSubmit}>
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Change Password</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-6">Change Password</h3>
 
-            <Input
-              label="Current Password"
-              type="password"
-              name="currentPassword"
-              value={formData.currentPassword}
-              onChange={handleChange}
-              error={errors.currentPassword}
-              placeholder="Enter your current password"
-              required
-            />
+            <div className="space-y-4">
+              <Input
+                label="Current Password"
+                type="password"
+                name="currentPassword"
+                value={formData.currentPassword}
+                onChange={handleChange}
+                error={errors.currentPassword}
+                placeholder="Enter your current password"
+                required
+              />
 
-            <Input
-              label="New Password"
-              type="password"
-              name="newPassword"
-              value={formData.newPassword}
-              onChange={handleChange}
-              error={errors.newPassword}
-              placeholder="Enter your new password (min 6 characters)"
-              required
-            />
+              <Input
+                label="New Password"
+                type="password"
+                name="newPassword"
+                value={formData.newPassword}
+                onChange={handleChange}
+                error={errors.newPassword}
+                placeholder="Enter your new password (min 6 characters)"
+                required
+              />
 
-            <Input
-              label="Confirm New Password"
-              type="password"
-              name="confirmPassword"
-              value={formData.confirmPassword}
-              onChange={handleChange}
-              error={errors.confirmPassword}
-              placeholder="Confirm your new password"
-              required
-            />
+              <Input
+                label="Confirm New Password"
+                type="password"
+                name="confirmPassword"
+                value={formData.confirmPassword}
+                onChange={handleChange}
+                error={errors.confirmPassword}
+                placeholder="Confirm your new password"
+                required
+              />
+            </div>
 
-            <div className="flex gap-2 mt-4">
+            <div className="flex gap-2 mt-6">
               <Button type="submit" disabled={loading}>
                 {loading ? 'Changing Password...' : 'Change Password'}
               </Button>
@@ -166,12 +144,8 @@ const Settings = () => {
           </form>
         </div>
       </div>
-    </div>
+    </AdminLayout>
   );
 };
 
 export default Settings;
-
-
-
-

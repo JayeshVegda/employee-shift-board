@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { getDashboardAnalytics, getUnreadIssueCount, getEmployees } from '../services/authService';
+import AdminLayout from '../components/AdminLayout';
 import {
   LineChart,
   Line,
@@ -72,7 +73,9 @@ const AdminDashboard = () => {
   const fetchUnreadIssues = async () => {
     try {
       const data = await getUnreadIssueCount();
-      setUnreadIssues(data.count || 0);
+      const count = data.count || 0;
+      setUnreadIssues(count);
+      localStorage.setItem('unreadIssues', count.toString());
     } catch (err) {
       console.error('Error fetching unread issues:', err);
     }
@@ -160,11 +163,6 @@ const AdminDashboard = () => {
     };
   }, [analytics?.employeePerformance]);
 
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    navigate('/login');
-  };
 
   const clearFilters = () => {
     setStartDate('');
@@ -209,48 +207,11 @@ const AdminDashboard = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* 1. Top Navigation */}
-      <nav className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16 items-center">
-            <div className="flex items-center">
-              <h1 className="text-xl font-bold text-gray-900">Employee Shift Board</h1>
-            </div>
-            <div className="flex items-center gap-4">
-              <Link to="/admin-dashboard" className="text-sm text-blue-600 hover:text-blue-800 font-semibold border-b-2 border-blue-600 pb-1">
-                Dashboard
-              </Link>
-              <Link to="/dashboard" className="text-sm text-gray-600 hover:text-gray-800">
-                Shifts
-              </Link>
-              <Link to="/employees" className="text-sm text-gray-600 hover:text-gray-800">
-                Employees
-              </Link>
-              <Link to="/issues" className="relative text-sm text-gray-600 hover:text-gray-800">
-                Issues
-                {unreadIssues > 0 && (
-                  <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                    {unreadIssues}
-                  </span>
-                )}
-              </Link>
-              <Link to="/settings" className="text-sm text-gray-600 hover:text-gray-800">
-                Settings
-              </Link>
-              <div className="ml-4 pl-4 border-l border-gray-300">
-                <span className="text-sm text-gray-600">{user.email}</span>
-                <Button onClick={handleLogout} variant="secondary" className="ml-2">
-                  Logout
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </nav>
-
-      <div className="flex-1">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <AdminLayout 
+      title="Employee Shift Board" 
+      subtitle="Comprehensive analytics and insights for your workforce"
+      currentPath="/admin-dashboard"
+    >
           {/* 2. Header KPIs */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
             <div className="bg-white shadow rounded-lg p-6 border-l-4 border-blue-500">
@@ -619,18 +580,7 @@ const AdminDashboard = () => {
             </div>
           </div>
         </div>
-      </div>
-
-      {/* 8. Footer */}
-      <footer className="bg-white border-t mt-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex justify-between items-center text-sm text-gray-500">
-            <p>© 2025 Employee Shift Board. All rights reserved.</p>
-            <p>Version 1.0.0</p>
-          </div>
-        </div>
-      </footer>
-    </div>
+    </AdminLayout>
   );
 };
 
