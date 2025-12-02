@@ -44,6 +44,18 @@ const ShiftForm = ({ employees, shift, onSuccess, onCancel, onUpdate }) => {
     }
     if (!formData.date) {
       newErrors.date = 'Date is required';
+    } else {
+      // Check if date is in the past (for admin creating new shifts)
+      if (!shift) {
+        const selectedDate = new Date(formData.date);
+        selectedDate.setHours(0, 0, 0, 0);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        if (selectedDate < today) {
+          newErrors.date = 'Cannot create shifts for past dates. Only future dates are allowed.';
+        }
+      }
     }
     if (!formData.startTime) {
       newErrors.startTime = 'Start time is required';
@@ -153,6 +165,7 @@ const ShiftForm = ({ employees, shift, onSuccess, onCancel, onUpdate }) => {
           onChange={handleChange}
           error={errors.date}
           required
+          min={shift ? undefined : new Date().toISOString().split('T')[0]}
         />
 
         <div className="grid grid-cols-2 gap-4">

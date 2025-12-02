@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { getIssueById, updateIssue } from '../services/authService';
+import AdminLayout from '../components/AdminLayout';
+import EmployeeLayout from '../components/EmployeeLayout';
 import Button from '../components/Button';
 import { getStatusColor, getPriorityColor } from '../utils/issueHelpers';
 
@@ -15,6 +17,7 @@ const IssueDetail = () => {
 
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const isAdmin = user.role === 'admin';
+  const Layout = isAdmin ? AdminLayout : EmployeeLayout;
 
   useEffect(() => {
     fetchIssue();
@@ -96,24 +99,12 @@ const IssueDetail = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16 items-center">
-            <h1 className="text-xl font-bold text-gray-900">Employee Shift Board</h1>
-            <div className="flex items-center gap-4">
-              <Link to="/dashboard" className="text-sm text-blue-600 hover:text-blue-800">
-                Dashboard
-              </Link>
-              <Link to="/issues" className="text-sm text-blue-600 hover:text-blue-800">
-                Issues
-              </Link>
-            </div>
-          </div>
-        </div>
-      </nav>
-
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <Layout 
+      title="Issue Details" 
+      subtitle="View and manage issue details"
+      currentPath="/issues"
+    >
+      <div className="max-w-4xl mx-auto">
         {error && (
           <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
             {error}
@@ -285,7 +276,7 @@ const IssueDetail = () => {
           </Button>
         </div>
       </div>
-    </div>
+    </Layout>
   );
 };
 

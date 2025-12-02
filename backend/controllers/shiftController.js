@@ -5,6 +5,7 @@ const { validateShiftRules } = require('../services/shiftService');
 const createShift = async (req, res) => {
   try {
     const { employeeId, date, startTime, endTime } = req.body;
+    const user = req.user;
 
     // Validate required fields
     if (!employeeId || !date || !startTime || !endTime) {
@@ -17,8 +18,8 @@ const createShift = async (req, res) => {
       return res.status(404).json({ message: 'Employee not found' });
     }
 
-    // Validate business rules
-    const validation = await validateShiftRules(employeeId, date, startTime, endTime);
+    // Validate business rules (pass isAdmin flag for past date validation)
+    const validation = await validateShiftRules(employeeId, date, startTime, endTime, null, user.role === 'admin');
     if (!validation.isValid) {
       return res.status(400).json({ 
         message: 'Validation failed',
@@ -205,13 +206,14 @@ const updateShift = async (req, res) => {
         }
       }
 
-      // Validate business rules
+      // Validate business rules (pass isAdmin flag for past date validation)
       const validation = await validateShiftRules(
         employeeId || shift.employeeId,
         date,
         startTime,
         endTime,
-        id // Exclude current shift from overlap check
+        id, // Exclude current shift from overlap check
+        req.user.role === 'admin' // Pass admin flag
       );
       
       if (!validation.isValid) {

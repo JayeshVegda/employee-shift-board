@@ -5,8 +5,10 @@ import ShiftForm from '../components/ShiftForm';
 import AdvancedShiftForm from '../components/AdvancedShiftForm';
 import ShiftTable from '../components/ShiftTable';
 import AdminLayout from '../components/AdminLayout';
+import EmployeeLayout from '../components/EmployeeLayout';
 import Button from '../components/Button';
 import Input from '../components/Input';
+import Pagination from '../components/Pagination';
 
 const Dashboard = () => {
   const [shifts, setShifts] = useState([]);
@@ -17,11 +19,15 @@ const Dashboard = () => {
   const [filterDepartment, setFilterDepartment] = useState('');
   const [filterStartDate, setFilterStartDate] = useState('');
   const [filterEndDate, setFilterEndDate] = useState('');
+  const [filterStartTime, setFilterStartTime] = useState('');
+  const [filterEndTime, setFilterEndTime] = useState('');
+  const [sortBy, setSortBy] = useState('date'); // 'date', 'employee', 'department', 'startTime'
+  const [sortOrder, setSortOrder] = useState('desc'); // 'asc', 'desc'
   const [showForm, setShowForm] = useState(false);
   const [showAdvancedForm, setShowAdvancedForm] = useState(false);
   const [editingShift, setEditingShift] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize] = useState(25);
+  const [pageSize, setPageSize] = useState(25);
   const navigate = useNavigate();
 
   const user = JSON.parse(localStorage.getItem('user') || '{}');
@@ -92,33 +98,104 @@ const Dashboard = () => {
     }
   };
 
-  // Filter shifts by department and date range
+  // Enhanced filtering
   const filteredShifts = shifts.filter(shift => {
+    // Filter by employee
+    if (filterEmployee && shift.employeeId?._id !== filterEmployee) {
+      return false;
+    }
+    
+    // Filter by department
     if (filterDepartment && shift.employeeId?.department !== filterDepartment) {
       return false;
     }
+    
+    // Filter by date range
+    if (filterStartDate) {
+      const shiftDate = new Date(shift.date);
+      const startDate = new Date(filterStartDate);
+      startDate.setHours(0, 0, 0, 0);
+      shiftDate.setHours(0, 0, 0, 0);
+      if (shiftDate < startDate) return false;
+    }
+    
     if (filterEndDate) {
       const shiftDate = new Date(shift.date);
       const endDate = new Date(filterEndDate);
+      endDate.setHours(23, 59, 59, 999);
+      shiftDate.setHours(23, 59, 59, 999);
       if (shiftDate > endDate) return false;
     }
+    
+    // Filter by time range
+    if (filterStartTime) {
+      const shiftStartMinutes = shift.startTime.split(':').map(Number).reduce((h, m) => h * 60 + m);
+      const filterStartMinutes = filterStartTime.split(':').map(Number).reduce((h, m) => h * 60 + m);
+      if (shiftStartMinutes < filterStartMinutes) return false;
+    }
+    
+    if (filterEndTime) {
+      const shiftEndMinutes = shift.endTime.split(':').map(Number).reduce((h, m) => h * 60 + m);
+      const filterEndMinutes = filterEndTime.split(':').map(Number).reduce((h, m) => h * 60 + m);
+      if (shiftEndMinutes > filterEndMinutes) return false;
+    }
+    
     return true;
   });
 
+  // Sorting
+  const sortedShifts = [...filteredShifts].sort((a, b) => {
+    let aValue, bValue;
+    
+    switch (sortBy) {
+      case 'date':
+        aValue = new Date(a.date);
+        bValue = new Date(b.date);
+        break;
+      case 'employee':
+        aValue = a.employeeId?.name || '';
+        bValue = b.employeeId?.name || '';
+        break;
+      case 'department':
+        aValue = a.employeeId?.department || '';
+        bValue = b.employeeId?.department || '';
+        break;
+      case 'startTime':
+        aValue = a.startTime;
+        bValue = b.startTime;
+        break;
+      default:
+        return 0;
+    }
+    
+    if (sortOrder === 'asc') {
+      return aValue > bValue ? 1 : aValue < bValue ? -1 : 0;
+    } else {
+      return aValue < bValue ? 1 : aValue > bValue ? -1 : 0;
+    }
+  });
+
   // Pagination
-  const totalPages = Math.ceil(filteredShifts.length / pageSize);
-  const paginatedShifts = filteredShifts.slice(
+  const totalPages = Math.ceil(sortedShifts.length / pageSize);
+  const paginatedShifts = sortedShifts.slice(
     (currentPage - 1) * pageSize,
     currentPage * pageSize
   );
 
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filterEmployee, filterDepartment, filterStartDate, filterEndDate, filterStartTime, filterEndTime]);
+
   // Get unique departments
   const departments = [...new Set(employees.map(emp => emp.department))].sort();
 
+  const Layout = isAdmin ? AdminLayout : EmployeeLayout;
+
   return (
-    <AdminLayout 
-      title="Shifts" 
-      subtitle="View, filter, and manage employee shifts"
+    <Layout 
+      title={isAdmin ? "Shift Board" : "My Shifts"} 
+      subtitle={isAdmin ? "View, filter, and manage employee shifts" : "View and manage your shifts"}
       currentPath="/dashboard"
     >
       {error && (
@@ -139,18 +216,24 @@ const Dashboard = () => {
         </div>
       )}
 
-      {/* Filters Bar */}
+      {/* Enhanced Filters Bar */}
       <div className="bg-white shadow rounded-lg p-6 mb-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Filters</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-semibold text-gray-900">Filters & Sorting</h3>
+          <div className="text-sm text-gray-500">
+            Showing {paginatedShifts.length} of {sortedShifts.length} shifts
+          </div>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-4">
           {isAdmin && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Filter by Employee
+                Employee
               </label>
               <select
                 value={filterEmployee}
-                onChange={(e) => { setFilterEmployee(e.target.value); setCurrentPage(1); }}
+                onChange={(e) => setFilterEmployee(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">All Employees</option>
@@ -165,11 +248,11 @@ const Dashboard = () => {
           {isAdmin && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Filter by Department
+                Department
               </label>
               <select
                 value={filterDepartment}
-                onChange={(e) => { setFilterDepartment(e.target.value); setCurrentPage(1); }}
+                onChange={(e) => setFilterDepartment(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">All Departments</option>
@@ -186,7 +269,7 @@ const Dashboard = () => {
             <input
               type="date"
               value={filterStartDate}
-              onChange={(e) => { setFilterStartDate(e.target.value); setCurrentPage(1); }}
+              onChange={(e) => setFilterStartDate(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
@@ -197,13 +280,77 @@ const Dashboard = () => {
             <input
               type="date"
               value={filterEndDate}
-              onChange={(e) => { setFilterEndDate(e.target.value); setCurrentPage(1); }}
+              onChange={(e) => setFilterEndDate(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Start Time (from)
+            </label>
+            <input
+              type="time"
+              value={filterStartTime}
+              onChange={(e) => setFilterStartTime(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              End Time (to)
+            </label>
+            <input
+              type="time"
+              value={filterEndTime}
+              onChange={(e) => setFilterEndTime(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Sort By
+            </label>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="date">Date</option>
+              <option value="employee">Employee</option>
+              <option value="department">Department</option>
+              <option value="startTime">Start Time</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Order
+            </label>
+            <select
+              value={sortOrder}
+              onChange={(e) => setSortOrder(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="desc">Descending</option>
+              <option value="asc">Ascending</option>
+            </select>
+          </div>
         </div>
-        {(filterEmployee || filterDepartment || filterStartDate || filterEndDate) && (
-          <div className="mt-4">
+        
+        <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+          <div className="flex items-center gap-2">
+            <label className="text-sm font-medium text-gray-700">Page Size:</label>
+            <select
+              value={pageSize}
+              onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
+              className="px-3 py-1 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value={10}>10</option>
+              <option value={25}>25</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+            </select>
+          </div>
+          {(filterEmployee || filterDepartment || filterStartDate || filterEndDate || filterStartTime || filterEndTime) && (
             <Button 
               variant="secondary" 
               onClick={() => {
@@ -211,13 +358,15 @@ const Dashboard = () => {
                 setFilterDepartment('');
                 setFilterStartDate('');
                 setFilterEndDate('');
+                setFilterStartTime('');
+                setFilterEndTime('');
                 setCurrentPage(1);
               }}
             >
               Clear All Filters
             </Button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* Shift Forms Modals */}
@@ -274,57 +423,16 @@ const Dashboard = () => {
           />
           {totalPages > 1 && (
             <div className="mt-6">
-              <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
-                <div className="flex-1 flex justify-between sm:hidden">
-                  <button
-                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                    disabled={currentPage === 1}
-                    className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
-                  >
-                    Previous
-                  </button>
-                  <button
-                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                    disabled={currentPage === totalPages}
-                    className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
-                  >
-                    Next
-                  </button>
-                </div>
-                <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-                  <div>
-                    <p className="text-sm text-gray-700">
-                      Showing <span className="font-medium">{(currentPage - 1) * pageSize + 1}</span> to{' '}
-                      <span className="font-medium">{Math.min(currentPage * pageSize, filteredShifts.length)}</span> of{' '}
-                      <span className="font-medium">{filteredShifts.length}</span> results
-                    </p>
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                      disabled={currentPage === 1}
-                      className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
-                    >
-                      Previous
-                    </button>
-                    <span className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white">
-                      Page {currentPage} of {totalPages}
-                    </span>
-                    <button
-                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                      disabled={currentPage === totalPages}
-                      className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
-                    >
-                      Next
-                    </button>
-                  </div>
-                </div>
-              </div>
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+              />
             </div>
           )}
         </>
       )}
-    </AdminLayout>
+    </Layout>
   );
 };
 

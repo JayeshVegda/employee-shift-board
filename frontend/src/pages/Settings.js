@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { changePassword } from '../services/authService';
 import AdminLayout from '../components/AdminLayout';
+import EmployeeLayout from '../components/EmployeeLayout';
 import Input from '../components/Input';
 import Button from '../components/Button';
 
@@ -16,6 +17,9 @@ const Settings = () => {
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
   const navigate = useNavigate();
+  const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const isAdmin = user.role === 'admin';
+  const Layout = isAdmin ? AdminLayout : EmployeeLayout;
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -76,9 +80,9 @@ const Settings = () => {
   };
 
   return (
-    <AdminLayout 
+    <Layout 
       title="Settings" 
-      subtitle="Manage your admin account preferences"
+      subtitle={isAdmin ? "Manage your admin account preferences" : "Manage your account preferences"}
       currentPath="/settings"
     >
       <div className="max-w-2xl">

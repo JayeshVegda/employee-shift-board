@@ -2,10 +2,9 @@ import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Button from './Button';
 
-const AdminLayout = ({ children, title, subtitle, currentPath }) => {
+const EmployeeLayout = ({ children, title, subtitle, currentPath }) => {
   const navigate = useNavigate();
   const user = JSON.parse(localStorage.getItem('user') || '{}');
-  const unreadIssues = parseInt(localStorage.getItem('unreadIssues') || '0');
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -20,25 +19,17 @@ const AdminLayout = ({ children, title, subtitle, currentPath }) => {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Global Header - Same on all pages */}
+      {/* Global Header - Employee Only */}
       <nav className="bg-white shadow-sm border-b sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16 items-center">
             <h1 className="text-xl font-bold text-gray-900">Employee Shift Board</h1>
             <div className="flex items-center gap-6">
               <Link to="/dashboard" className={`text-sm ${isActive('/dashboard')}`}>
-                Shift Board
+                My Shifts
               </Link>
-              <Link to="/employees" className={`text-sm ${isActive('/employees')}`}>
-                Employees
-              </Link>
-              <Link to="/issues" className={`text-sm relative ${isActive('/issues')}`}>
+              <Link to="/issues" className={`text-sm ${isActive('/issues')}`}>
                 Issues
-                {unreadIssues > 0 && (
-                  <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                    {unreadIssues}
-                  </span>
-                )}
               </Link>
               <Link to="/settings" className={`text-sm ${isActive('/settings')}`}>
                 Settings
@@ -83,8 +74,5 @@ const AdminLayout = ({ children, title, subtitle, currentPath }) => {
   );
 };
 
-export default AdminLayout;
-
-
-
+export default EmployeeLayout;
 

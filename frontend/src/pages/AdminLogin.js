@@ -20,7 +20,7 @@ const AdminLogin = () => {
       const response = await loginAdmin(email, password);
       localStorage.setItem('token', response.token);
       localStorage.setItem('user', JSON.stringify(response.user));
-      navigate('/admin-dashboard');
+      navigate('/dashboard');
     } catch (err) {
       if (err.response) {
         // Server responded with error

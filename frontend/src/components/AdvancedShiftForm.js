@@ -73,6 +73,16 @@ const AdvancedShiftForm = ({ employees, onSuccess, onCancel }) => {
     }
     if (!formData.startDate) {
       newErrors.startDate = 'Start date is required';
+    } else {
+      // Check if start date is in the past
+      const startDate = new Date(formData.startDate);
+      startDate.setHours(0, 0, 0, 0);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      if (startDate < today) {
+        newErrors.startDate = 'Cannot create shifts for past dates. Only future dates are allowed.';
+      }
     }
     if (!formData.endDate) {
       newErrors.endDate = 'End date is required';
@@ -97,6 +107,16 @@ const AdvancedShiftForm = ({ employees, onSuccess, onCancel }) => {
     }
     if (!formData.startDateRecurring) {
       newErrors.startDateRecurring = 'Start date is required';
+    } else {
+      // Check if start date is in the past
+      const startDate = new Date(formData.startDateRecurring);
+      startDate.setHours(0, 0, 0, 0);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      if (startDate < today) {
+        newErrors.startDateRecurring = 'Cannot create shifts for past dates. Only future dates are allowed.';
+      }
     }
     if (!formData.endDateRecurring) {
       newErrors.endDateRecurring = 'End date is required';
@@ -331,6 +351,7 @@ const AdvancedShiftForm = ({ employees, onSuccess, onCancel }) => {
               onChange={handleChange}
               error={errors.startDate}
               required
+              min={new Date().toISOString().split('T')[0]}
             />
             <Input
               label="End Date"
@@ -424,6 +445,7 @@ const AdvancedShiftForm = ({ employees, onSuccess, onCancel }) => {
               onChange={handleChange}
               error={errors.startDateRecurring}
               required
+              min={new Date().toISOString().split('T')[0]}
             />
             <Input
               label="End Date"

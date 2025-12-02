@@ -32,8 +32,20 @@ const calculateDuration = (startTime, endTime) => {
 /**
  * Validate shift business rules
  */
-const validateShiftRules = async (employeeId, date, startTime, endTime, excludeShiftId = null) => {
+const validateShiftRules = async (employeeId, date, startTime, endTime, excludeShiftId = null, isAdmin = false) => {
   const errors = [];
+
+  // Rule 0: Admin cannot create shifts for past dates (only future dates allowed)
+  if (isAdmin) {
+    const shiftDate = new Date(date);
+    shiftDate.setHours(0, 0, 0, 0);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    if (shiftDate < today) {
+      errors.push('Cannot create shifts for past dates. Only future dates are allowed.');
+    }
+  }
 
   // Rule 1: Minimum shift duration = 4 hours
   const duration = calculateDuration(startTime, endTime);

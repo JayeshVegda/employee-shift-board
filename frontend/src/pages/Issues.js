@@ -6,6 +6,7 @@ import IssueTable from '../components/IssueTable';
 import IssueEditModal from '../components/IssueEditModal';
 import Pagination from '../components/Pagination';
 import AdminLayout from '../components/AdminLayout';
+import EmployeeLayout from '../components/EmployeeLayout';
 import Button from '../components/Button';
 import { getStatusColor, getPriorityColor } from '../utils/issueHelpers';
 
@@ -143,10 +144,12 @@ const Issues = () => {
     return true;
   });
 
+  const Layout = isAdmin ? AdminLayout : EmployeeLayout;
+
   return (
-    <AdminLayout 
-      title="Issue Management" 
-      subtitle="Track and resolve issues raised by employees"
+    <Layout 
+      title={isAdmin ? "Issue Management" : "My Issues"} 
+      subtitle={isAdmin ? "Track and resolve issues raised by employees" : "View and manage your reported issues"}
       currentPath="/issues"
     >
       {error && (

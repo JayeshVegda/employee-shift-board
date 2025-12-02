@@ -31,7 +31,7 @@ function App() {
           path="/admin-dashboard"
           element={
             <AdminRoute>
-              <AdminDashboard />
+              <Navigate to="/dashboard" replace />
             </AdminRoute>
           }
         />
