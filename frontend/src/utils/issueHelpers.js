@@ -56,3 +56,6 @@ export const truncateText = (text, maxLength = 50) => {
 
 
 
+
+
+

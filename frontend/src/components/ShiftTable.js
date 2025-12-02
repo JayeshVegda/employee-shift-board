@@ -1,7 +1,7 @@
 import React from 'react';
 import Button from './Button';
 
-const ShiftTable = ({ shifts, onDelete, isAdmin, onReportIssue, onEdit }) => {
+const ShiftTable = ({ shifts, onDelete, isAdmin, onReportIssue, onEdit = () => {} }) => {
   const formatDate = (dateString) => {
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', {

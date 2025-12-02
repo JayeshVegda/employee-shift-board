@@ -1,15 +1,27 @@
-import React, { useState } from 'react';
-import { createShift } from '../services/authService';
+import React, { useState, useEffect } from 'react';
+import { createShift, updateShift } from '../services/authService';
 import Input from './Input';
 import Button from './Button';
 
-const ShiftForm = ({ employees, onSuccess, onCancel }) => {
+const ShiftForm = ({ employees, shift, onSuccess, onCancel, onUpdate }) => {
   const [formData, setFormData] = useState({
     employeeId: '',
     date: '',
     startTime: '',
     endTime: '',
   });
+
+  useEffect(() => {
+    if (shift) {
+      const shiftDate = new Date(shift.date).toISOString().split('T')[0];
+      setFormData({
+        employeeId: shift.employeeId?._id || shift.employeeId || '',
+        date: shiftDate,
+        startTime: shift.startTime || '',
+        endTime: shift.endTime || '',
+      });
+    }
+  }, [shift]);
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
   const [submitError, setSubmitError] = useState('');
@@ -65,14 +77,19 @@ const ShiftForm = ({ employees, onSuccess, onCancel }) => {
 
     setLoading(true);
     try {
-      console.log('Creating shift with data:', formData);
-      await createShift(formData);
-      setFormData({
-        employeeId: '',
-        date: '',
-        startTime: '',
-        endTime: '',
-      });
+      if (shift && onUpdate) {
+        console.log('Updating shift with data:', formData);
+        await onUpdate(shift._id, formData);
+      } else {
+        console.log('Creating shift with data:', formData);
+        await createShift(formData);
+        setFormData({
+          employeeId: '',
+          date: '',
+          startTime: '',
+          endTime: '',
+        });
+      }
       onSuccess();
     } catch (err) {
       console.error('Error creating shift:', err);
@@ -88,8 +105,7 @@ const ShiftForm = ({ employees, onSuccess, onCancel }) => {
   };
 
   return (
-    <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
-      <h3 className="text-lg font-semibold mb-4">Create New Shift</h3>
+    <div>
       <form onSubmit={handleSubmit}>
         {submitError && (
           <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
@@ -162,7 +178,7 @@ const ShiftForm = ({ employees, onSuccess, onCancel }) => {
 
         <div className="flex gap-2 mt-4">
           <Button type="submit" disabled={loading || employees.length === 0}>
-            {loading ? 'Creating...' : 'Create Shift'}
+            {loading ? (shift ? 'Updating...' : 'Creating...') : (shift ? 'Update Shift' : 'Create Shift')}
           </Button>
           <Button type="button" variant="secondary" onClick={onCancel}>
             Cancel

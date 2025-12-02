@@ -90,11 +90,7 @@ const EmployeeForm = ({ employee, onSuccess, onCancel }) => {
   };
 
   return (
-    <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
-      <h3 className="text-lg font-semibold mb-4">
-        {employee ? 'Edit Employee' : 'Create New Employee'}
-      </h3>
-      <form onSubmit={handleSubmit}>
+    <form onSubmit={handleSubmit}>
         {submitError && (
           <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
             {submitError}
@@ -143,7 +139,6 @@ const EmployeeForm = ({ employee, onSuccess, onCancel }) => {
           </Button>
         </div>
       </form>
-    </div>
   );
 };
 

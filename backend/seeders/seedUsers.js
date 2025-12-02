@@ -57,10 +57,12 @@ const seedUsers = async () => {
       console.log('✅ Admin employee created: ADMIN001');
     }
 
-    // Delete existing admin user if exists to ensure fresh creation
+    // Delete existing admin users if exists to ensure fresh creation
     await User.deleteOne({ email: 'hire-me@anshumat.org' });
+    await User.deleteOne({ email: 'admin@admin.com' });
     
-    const adminUser = await User.create({
+    // Create first admin user
+    const adminUser1 = await User.create({
       email: 'hire-me@anshumat.org',
       password: 'HireMe@2025!',
       role: 'admin',
@@ -68,6 +70,27 @@ const seedUsers = async () => {
     });
     console.log('✅ Admin user created: hire-me@anshumat.org');
     console.log('   Password: HireMe@2025!');
+    console.log('   Role: admin\n');
+
+    // Create second admin user
+    let adminEmployee2 = await Employee.findOne({ employeeCode: 'ADMIN002' });
+    if (!adminEmployee2) {
+      adminEmployee2 = await Employee.create({
+        name: 'Admin User 2',
+        employeeCode: 'ADMIN002',
+        department: 'Administration',
+      });
+      console.log('✅ Admin employee 2 created: ADMIN002');
+    }
+
+    const adminUser2 = await User.create({
+      email: 'admin@admin.com',
+      password: 'admin123',
+      role: 'admin',
+      employeeId: adminEmployee2._id,
+    });
+    console.log('✅ Admin user created: admin@admin.com');
+    console.log('   Password: admin123');
     console.log('   Role: admin\n');
 
     // ============================================
@@ -134,7 +157,7 @@ const seedUsers = async () => {
     console.log('\n' + '='.repeat(50));
     console.log('📊 SEEDING SUMMARY');
     console.log('='.repeat(50));
-    console.log(`✅ Admin user: hire-me@anshumat.org`);
+    console.log(`✅ Admin users: hire-me@anshumat.org, admin@admin.com`);
     console.log(`✅ Employees created: ${createdCount}`);
     console.log(`🔄 Employees updated: ${updatedCount}`);
     console.log(`✅ Total employees: ${indianEmployees.length}`);
@@ -146,9 +169,11 @@ const seedUsers = async () => {
     console.log(`   Total Employees: ${totalEmployees}`);
     console.log('='.repeat(50));
     console.log('\n✅ Seeding completed successfully!');
-    console.log('\n🔐 Demo Login Credentials:');
-    console.log('   Email: hire-me@anshumat.org');
-    console.log('   Password: HireMe@2025!');
+    console.log('\n🔐 Admin Login Credentials:');
+    console.log('   1. Email: hire-me@anshumat.org');
+    console.log('      Password: HireMe@2025!');
+    console.log('   2. Email: admin@admin.com');
+    console.log('      Password: admin123');
     console.log('   Role: Admin\n');
 
     process.exit(0);
