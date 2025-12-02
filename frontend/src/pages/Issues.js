@@ -324,7 +324,7 @@ const Issues = () => {
           onSuccess={handleEditSuccess}
         />
       )}
-    </AdminLayout>
+    </Layout>
   );
 };
 

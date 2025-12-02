@@ -61,7 +61,11 @@ const IssueTable = ({ issues, onEdit, onDelete, onResolve }) => {
               // Show issue even if shiftData is missing (for issues not related to shifts)
               if (!shiftData) {
                 return (
-                  <tr key={issue._id} className={`hover:bg-gray-50 ${!issue.isRead ? 'bg-blue-50' : ''}`}>
+                  <tr 
+                    key={issue._id} 
+                    className={`hover:bg-gray-50 cursor-pointer ${!issue.isRead ? 'bg-blue-50' : ''}`}
+                    onClick={() => window.location.href = `/issues/${issue._id}`}
+                  >
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
                       <span className={`text-xs font-medium px-2 py-1 rounded ${getStatusColor(issue.status)}`}>
                         {issue.status.toUpperCase()}
@@ -86,23 +90,29 @@ const IssueTable = ({ issues, onEdit, onDelete, onResolve }) => {
                       </Link>
                       <span className="ml-2">- {issue.description?.substring(0, 50)}...</span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm" onClick={(e) => e.stopPropagation()}>
                       <div className="flex gap-2">
-                        <Link to={`/issues/${issue._id}`}>
+                        <Link to={`/issues/${issue._id}`} onClick={(e) => e.stopPropagation()}>
                           <Button variant="secondary" className="text-xs">
                             View
                           </Button>
                         </Link>
                         <Button
                           variant="secondary"
-                          onClick={() => onEdit(issue)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onEdit(issue);
+                          }}
                           className="text-xs"
                         >
                           Edit
                         </Button>
                         {issue.status !== 'closed' && (
                           <Button
-                            onClick={() => onResolve(issue)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onResolve(issue);
+                            }}
                             className="text-xs"
                           >
                             Resolve
@@ -110,7 +120,10 @@ const IssueTable = ({ issues, onEdit, onDelete, onResolve }) => {
                         )}
                         <Button
                           variant="danger"
-                          onClick={() => onDelete(issue._id)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDelete(issue._id);
+                          }}
                           className="text-xs"
                         >
                           Delete
@@ -127,7 +140,8 @@ const IssueTable = ({ issues, onEdit, onDelete, onResolve }) => {
               return (
                 <tr 
                   key={issue._id} 
-                  className={`hover:bg-gray-50 ${!issue.isRead ? 'bg-blue-50' : ''}`}
+                  className={`hover:bg-gray-50 cursor-pointer ${!issue.isRead ? 'bg-blue-50' : ''}`}
+                  onClick={() => window.location.href = `/issues/${issue._id}`}
                 >
                   <td className="px-6 py-4 whitespace-nowrap text-sm">
                     <span className={`text-xs font-medium px-2 py-1 rounded ${getStatusColor(issue.status)}`}>
@@ -192,23 +206,29 @@ const IssueTable = ({ issues, onEdit, onDelete, onResolve }) => {
                       )}
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm" onClick={(e) => e.stopPropagation()}>
                     <div className="flex gap-2">
-                      <Link to={`/issues/${issue._id}`}>
+                      <Link to={`/issues/${issue._id}`} onClick={(e) => e.stopPropagation()}>
                         <Button variant="secondary" className="text-xs">
                           View
                         </Button>
                       </Link>
                       <Button
                         variant="secondary"
-                        onClick={() => onEdit(issue)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onEdit(issue);
+                        }}
                         className="text-xs"
                       >
                         Edit
                       </Button>
                       {issue.status !== 'closed' && (
                         <Button
-                          onClick={() => onResolve(issue)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onResolve(issue);
+                          }}
                           className="text-xs"
                         >
                           Resolve
@@ -216,7 +236,10 @@ const IssueTable = ({ issues, onEdit, onDelete, onResolve }) => {
                       )}
                       <Button
                         variant="danger"
-                        onClick={() => onDelete(issue._id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDelete(issue._id);
+                        }}
                         className="text-xs"
                       >
                         Delete
