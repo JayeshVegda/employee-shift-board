@@ -24,11 +24,10 @@ const AdminLayout = ({ children, title, subtitle, currentPath }) => {
       <nav className="bg-white shadow-sm border-b sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16 items-center">
-            <h1 className="text-xl font-bold text-gray-900">Employee Shift Board</h1>
+            <Link to="/dashboard" className="text-xl font-bold text-gray-900 hover:text-blue-600">
+              Employee Shift Board
+            </Link>
             <div className="flex items-center gap-6">
-              <Link to="/dashboard" className={`text-sm ${isActive('/dashboard')}`}>
-                Shift Board
-              </Link>
               <Link to="/employees" className={`text-sm ${isActive('/employees')}`}>
                 Employees
               </Link>
